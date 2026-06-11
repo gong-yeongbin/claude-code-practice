@@ -1,0 +1,34 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  BUYER
+  SOURCING
+  MANUFACTURER
+
+  @@map("user_role")
+}
+
+/// 시스템 사용자. 역할에 따라 주문자/소싱팀/생산자로 구분
+model User {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  /// BUYER(주문자), SOURCING(소싱팀), MANUFACTURER(생산자) — 권한 검증의 기준
+  role      UserRole
+  createdAt DateTime @default(now()) @db.Timestamptz @map("created_at")
+  updatedAt DateTime @updatedAt @db.Timestamptz @map("updated_at")
+
+  @@map("users")
+}
