@@ -1,0 +1,31 @@
+# Users 리소스 엔드포인트를 IntelliJ HTTP Client로 테스트하는 요청 모음
+# 실행 전 우상단에서 환경(local)을 선택한다. host 값은 http-client.env.json 참조.
+
+### Hello World (앱 헬스 체크)
+GET {{host}}/
+Accept: text/plain
+
+### 유저 생성
+# @name createUser
+POST {{host}}/users
+Content-Type: application/json
+
+{
+  "name": "홍길동",
+  "role": "BUYER"
+}
+
+### 유저 전체 조회 (첫 번째 id를 firstUserId 전역 변수에 저장)
+GET {{host}}/users
+Accept: application/json
+
+> {%
+    client.global.set("firstUserId", response.body.data[0].id);
+%}
+
+### 유저 단건 조회 (저장된 firstUserId 사용)
+GET {{host}}/users/{{firstUserId}}
+Accept: application/json
+
+### 유저 삭제 (204 No Content)
+DELETE {{host}}/users/{{firstUserId}}
