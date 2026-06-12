@@ -16,23 +16,23 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
+  async create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     return this.usersService.create(dto);
   }
 
   @Get()
-  findMany(): Promise<UserResponseDto[]> {
+  async findMany(): Promise<UserResponseDto[]> {
     return this.usersService.findMany();
   }
 
   @Get(':id')
-  find(@Param('id') id: string): Promise<UserResponseDto> {
+  async find(@Param('id') id: string): Promise<UserResponseDto> {
     return this.usersService.find(id);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  delete(@Param('id') id: string): Promise<void> {
+  async delete(@Param('id') id: string): Promise<void> {
     return this.usersService.delete(id);
   }
 }
