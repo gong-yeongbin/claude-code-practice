@@ -31,6 +31,16 @@
 - 단건 조회는 `T | null` 반환 (null 처리는 Service 책임)
 - Prisma 생성 타입(`User`, `UserRole` 등)을 그대로 사용
 
+### 응답 구조
+
+모든 HTTP 응답은 `src/common`의 전역 인터셉터·예외 필터를 거쳐 `ApiResponse<T>` 구조로 통일된다(`src/common/dto/api-response.dto.ts`). Controller/Service는 래핑을 신경 쓰지 않고 DTO나 예외만 반환·발생시킨다.
+
+- 성공 응답은 `TransformInterceptor`가 `{ success: true, statusCode, message, data, timestamp, path }`로 감싼다. Controller는 ResponseDto를 그대로 반환한다.
+- 에러 응답은 `AllExceptionsFilter`가 `{ success: false, statusCode, message, error, timestamp, path }`로 감싼다. Service는 `NotFoundException` 등 `HttpException`만 던지면 된다.
+- DELETE처럼 204를 반환하는 핸들러는 인터셉터가 래핑하지 않고 빈 body를 유지한다.
+- 성공 메시지를 바꾸려면 핸들러에 `@ResponseMessage('메시지')`를 붙인다(`src/common/decorators/response-message.decorator.ts`). 미지정 시 `'OK'`.
+- 응답 래퍼는 전역 등록(`main.ts`)으로 동작하므로 새 Controller를 추가해도 별도 작업이 필요 없다.
+
 ### 테스트
 
 - 테스트 파일은 대상 파일과 같은 디렉토리에 `*.spec.ts`로 작성
