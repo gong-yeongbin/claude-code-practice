@@ -3,6 +3,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersRepository } from './purchase-orders.repository';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
+import { CreateChangeRequestDto } from './dto/create-change-request.dto';
+import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
@@ -28,6 +30,23 @@ export class PurchaseOrdersService {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
     return PurchaseOrderResponseDto.fromEntity(order);
+  }
+
+  // 주문자가 특정 발주서에 대한 변경 요청을 생성. 발주서가 없으면 NotFoundException
+  async requestChange(id: string, dto: CreateChangeRequestDto): Promise<ChangeRequestResponseDto> {
+    const purchaseOrderId = Number(id);
+    const order = await this.purchaseOrdersRepository.findById(purchaseOrderId);
+    if (!order) {
+      throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+
+    const changeRequest = await this.purchaseOrdersRepository.createChangeRequest({
+      purchaseOrderId,
+      requesterId: dto.requesterId,
+      reason: dto.reason,
+      changes: dto.changes as Prisma.InputJsonValue,
+    });
+    return ChangeRequestResponseDto.fromEntity(changeRequest);
   }
 
   // 발주 번호 채번. PO-yyyyMMddHHmmss-랜덤4자리로 사람이 읽기 쉬운 번호 생성

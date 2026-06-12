@@ -38,6 +38,7 @@ describe('PurchaseOrdersRepository', () => {
 
   afterEach(async () => {
     // 자식 → 부모 순으로 정리 (FK 제약)
+    await prisma.changeRequest.deleteMany();
     await prisma.purchaseOrderVersion.deleteMany();
     await prisma.purchaseOrder.deleteMany();
   });
@@ -96,6 +97,27 @@ describe('PurchaseOrdersRepository', () => {
       const found = await repository.findById(999999);
 
       expect(found).toBeNull();
+    });
+  });
+
+  describe('createChangeRequest', () => {
+    it('PENDING 상태의 변경 요청을 생성해 반환한다', async () => {
+      const po = await repository.create(baseInput());
+
+      const cr = await repository.createChangeRequest({
+        purchaseOrderId: po.id,
+        requesterId: buyerId,
+        reason: '수량을 늘려야 합니다',
+        changes: { quantity: { old: 1000, new: 1500 } },
+      });
+
+      expect(cr.id).toBeDefined();
+      expect(cr.purchaseOrderId).toBe(po.id);
+      expect(cr.requesterId).toBe(buyerId);
+      expect(cr.reason).toBe('수량을 늘려야 합니다');
+      expect(cr.changes).toEqual({ quantity: { old: 1000, new: 1500 } });
+      expect(cr.status).toBe('PENDING');
+      expect(cr.reviewerId).toBeNull();
     });
   });
 });

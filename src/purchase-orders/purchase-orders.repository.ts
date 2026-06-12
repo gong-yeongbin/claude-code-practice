@@ -1,7 +1,7 @@
 // 발주서 생성을 담당하는 Repository. 트랜잭션으로 PurchaseOrder와 v1 Version을 함께 생성
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '../../generated/prisma/client';
+import { ChangeRequest, Prisma } from '../../generated/prisma/client';
 import { PurchaseOrderWithVersion } from './dto/purchase-order-response.dto';
 
 // 발주서 생성에 필요한 메타 + v1 도메인 필드
@@ -13,6 +13,14 @@ export interface CreatePurchaseOrderInput {
   unitPrice: string;
   deliveryDate: Date;
   spec?: Prisma.InputJsonValue;
+}
+
+// 변경 요청 생성에 필요한 입력. status는 PENDING 기본값
+export interface CreateChangeRequestInput {
+  purchaseOrderId: number;
+  requesterId: number;
+  reason: string;
+  changes: Prisma.InputJsonValue;
 }
 
 @Injectable()
@@ -61,5 +69,16 @@ export class PurchaseOrdersRepository {
     });
 
     return { ...order, currentVersionData: version! };
+  }
+
+  async createChangeRequest(input: CreateChangeRequestInput): Promise<ChangeRequest> {
+    return this.prisma.changeRequest.create({
+      data: {
+        purchaseOrderId: input.purchaseOrderId,
+        requesterId: input.requesterId,
+        reason: input.reason,
+        changes: input.changes,
+      },
+    });
   }
 }

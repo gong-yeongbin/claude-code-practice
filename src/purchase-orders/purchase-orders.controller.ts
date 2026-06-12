@@ -3,6 +3,8 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
+import { CreateChangeRequestDto } from './dto/create-change-request.dto';
+import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 
 @Controller('purchase-orders')
 export class PurchaseOrdersController {
@@ -16,5 +18,13 @@ export class PurchaseOrdersController {
   @Get(':id')
   async find(@Param('id') id: string): Promise<PurchaseOrderResponseDto> {
     return this.purchaseOrdersService.find(id);
+  }
+
+  @Post(':id/change-requests')
+  async requestChange(
+    @Param('id') id: string,
+    @Body() dto: CreateChangeRequestDto,
+  ): Promise<ChangeRequestResponseDto> {
+    return this.purchaseOrdersService.requestChange(id, dto);
   }
 }

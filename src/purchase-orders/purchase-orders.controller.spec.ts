@@ -5,13 +5,16 @@ import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
-import { OrderStatus } from '../../generated/prisma/client';
+import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
+import { CreateChangeRequestDto } from './dto/create-change-request.dto';
+import { ChangeRequestStatus, OrderStatus } from '../../generated/prisma/client';
 
 describe('PurchaseOrdersController', () => {
   let controller: PurchaseOrdersController;
   let service: {
     create: jest.Mock;
     find: jest.Mock;
+    requestChange: jest.Mock;
   };
 
   const mockResponse: PurchaseOrderResponseDto = {
@@ -29,10 +32,25 @@ describe('PurchaseOrdersController', () => {
     updatedAt: new Date('2026-01-01T00:00:00Z'),
   };
 
+  const mockChangeRequest: ChangeRequestResponseDto = {
+    id: 5,
+    purchaseOrderId: 1,
+    requesterId: 10,
+    reason: '수량을 늘려야 합니다',
+    changes: { quantity: { old: 1000, new: 1500 } },
+    status: ChangeRequestStatus.PENDING,
+    reviewerId: null,
+    reviewComment: null,
+    reviewedAt: null,
+    createdAt: new Date('2026-01-02T00:00:00Z'),
+    updatedAt: new Date('2026-01-02T00:00:00Z'),
+  };
+
   beforeEach(async () => {
     service = {
       create: jest.fn(),
       find: jest.fn(),
+      requestChange: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -83,6 +101,29 @@ describe('PurchaseOrdersController', () => {
       service.find.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
       await expect(controller.find('999')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('requestChange', () => {
+    const dto: CreateChangeRequestDto = {
+      requesterId: 10,
+      reason: '수량을 늘려야 합니다',
+      changes: { quantity: { old: 1000, new: 1500 } },
+    };
+
+    it('id와 dto를 service.requestChange에 전달하고 결과를 반환한다', async () => {
+      service.requestChange.mockResolvedValue(mockChangeRequest);
+
+      const result = await controller.requestChange('1', dto);
+
+      expect(service.requestChange).toHaveBeenCalledWith('1', dto);
+      expect(result).toBe(mockChangeRequest);
+    });
+
+    it('service가 던진 예외를 그대로 전파한다', async () => {
+      service.requestChange.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
+
+      await expect(controller.requestChange('999', dto)).rejects.toThrow(NotFoundException);
     });
   });
 });

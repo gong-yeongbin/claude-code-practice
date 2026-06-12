@@ -8,13 +8,22 @@ import {
   PurchaseOrderWithVersion,
 } from './dto/purchase-order-response.dto';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
-import { OrderStatus, Prisma } from '../../generated/prisma/client';
+import { CreateChangeRequestDto } from './dto/create-change-request.dto';
+import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
+import {
+  ChangeRequest,
+  ChangeRequestStatus,
+  OrderStatus,
+  Prisma,
+} from '../../generated/prisma/client';
+import { CreateChangeRequestInput } from './purchase-orders.repository';
 
 describe('PurchaseOrdersService', () => {
   let service: PurchaseOrdersService;
   let repository: {
     create: jest.Mock<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>;
     findById: jest.Mock<Promise<PurchaseOrderWithVersion | null>, [number]>;
+    createChangeRequest: jest.Mock<Promise<ChangeRequest>, [CreateChangeRequestInput]>;
   };
 
   const mockEntity: PurchaseOrderWithVersion = {
@@ -41,10 +50,25 @@ describe('PurchaseOrdersService', () => {
     },
   };
 
+  const mockChangeRequest: ChangeRequest = {
+    id: 5,
+    purchaseOrderId: 1,
+    requesterId: 10,
+    reason: '수량을 늘려야 합니다',
+    changes: { quantity: { old: 1000, new: 1500 } },
+    status: ChangeRequestStatus.PENDING,
+    reviewerId: null,
+    reviewComment: null,
+    reviewedAt: null,
+    createdAt: new Date('2026-01-02T00:00:00Z'),
+    updatedAt: new Date('2026-01-02T00:00:00Z'),
+  };
+
   beforeEach(async () => {
     repository = {
       create: jest.fn<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>(),
       findById: jest.fn<Promise<PurchaseOrderWithVersion | null>, [number]>(),
+      createChangeRequest: jest.fn<Promise<ChangeRequest>, [CreateChangeRequestInput]>(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -138,6 +162,47 @@ describe('PurchaseOrdersService', () => {
 
       await expect(service.find('999')).rejects.toThrow(NotFoundException);
       await expect(service.find('999')).rejects.toThrow('PurchaseOrder 999 not found');
+    });
+  });
+
+  describe('requestChange', () => {
+    const dto: CreateChangeRequestDto = {
+      requesterId: 10,
+      reason: '수량을 늘려야 합니다',
+      changes: { quantity: { old: 1000, new: 1500 } },
+    };
+
+    it('발주서가 존재하면 변경 요청을 생성하고 ResponseDto를 반환한다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.createChangeRequest.mockResolvedValue(mockChangeRequest);
+
+      const result = await service.requestChange('1', dto);
+
+      expect(repository.findById).toHaveBeenCalledWith(1);
+      expect(repository.createChangeRequest).toHaveBeenCalledTimes(1);
+      const arg = repository.createChangeRequest.mock.calls[0][0];
+      expect(arg.purchaseOrderId).toBe(1);
+      expect(arg.requesterId).toBe(10);
+      expect(arg.reason).toBe('수량을 늘려야 합니다');
+      expect(arg.changes).toEqual({ quantity: { old: 1000, new: 1500 } });
+
+      expect(result).toBeInstanceOf(ChangeRequestResponseDto);
+      expect(result.id).toBe(5);
+      expect(result.purchaseOrderId).toBe(1);
+      expect(result.requesterId).toBe(10);
+      expect(result.status).toBe(ChangeRequestStatus.PENDING);
+      expect(result.reviewerId).toBeNull();
+      expect(result.changes).toEqual({ quantity: { old: 1000, new: 1500 } });
+    });
+
+    it('발주서가 존재하지 않으면 NotFoundException을 던지고 변경 요청을 생성하지 않는다', async () => {
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.requestChange('999', dto)).rejects.toThrow(NotFoundException);
+      await expect(service.requestChange('999', dto)).rejects.toThrow(
+        'PurchaseOrder 999 not found',
+      );
+      expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
   });
 });

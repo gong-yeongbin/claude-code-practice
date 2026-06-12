@@ -38,3 +38,18 @@ Content-Type: application/json
 ### 발주서 단건 조회 (저장된 purchaseOrderId 사용)
 GET {{host}}/purchase-orders/{{purchaseOrderId}}
 Accept: application/json
+
+### 발주서 변경 요청 (주문자가 저장된 purchaseOrderId/buyerId로 변경 요청 생성)
+POST {{host}}/purchase-orders/{{purchaseOrderId}}/change-requests
+Content-Type: application/json
+
+{
+  "requesterId": {{buyerId}},
+  "reason": "수량을 늘려야 합니다",
+  "changes": {
+    "quantity": {
+      "old": 1000,
+      "new": 1500
+    }
+  }
+}
