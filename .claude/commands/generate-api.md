@@ -134,9 +134,13 @@ pnpm test -- src/$ARGUMENTS --coverage
 ### 5단계: 완료 안내
 
 다음 작업이 남아있음을 안내한다.
-1. `prisma/schema.prisma`에 Xxx 모델 추가 (id BigInt, createdAt, updatedAt + 도메인 필드)
-2. `pnpm prisma:migrate` 실행
-3. `src/$ARGUMENTS/dto/` 파일에 실제 도메인 필드 추가
-4. `repository.spec.ts`의 TODO 주석 활성화 및 필드 채우기
-5. `src/app.module.ts`에 XxxModule import 등록
-6. `docker-compose up -d` 후 `pnpm test -- src/$ARGUMENTS` 전체 통과 확인
+- `src/app.module.ts`에 XxxModule import 등록
+
+등록이 완료되면 `http/$ARGUMENTS.http`를 생성한다. `http/CLAUDE.md`의 패턴을 따른다.
+- 첫 줄에 해당 리소스의 역할을 설명하는 한 줄짜리 한국어 주석을 단다.
+- 컨트롤러의 엔드포인트별로 `###` 요청을 작성한다 (생성/전체 조회/단건 조회/삭제 등).
+- 전체 조회에서 응답 핸들러 스크립트로 첫 항목 id를 전역 변수에 저장하고, 단건 조회·삭제에서 그 변수를 참조한다.
+- 응답 본문 참조 시 `data` 래핑을 고려한다 (목록은 `data[0].id`, 단건은 `data.id`).
+- 생성 요청 본문에는 DTO 도메인 필드를 채운다. 파악이 어려우면 `// TODO` 주석으로 남긴다.
+
+모든 작업이 완료되면 `generate-commit-message` 스킬을 호출해 커밋 메시지를 생성한다.
