@@ -47,7 +47,7 @@ ChangeRequest ──< PurchaseOrderVersion   (이 변경요청이 만든 버전,
 
 ## 컨벤션 (새 모델 추가 시 준수)
 
-- **id** — `BigInt @id @default(autoincrement())`. PK/FK는 항상 `BigInt`.
+- **id** — `Int @id @default(autoincrement())`. PK/FK는 `Int`.
 - **타임스탬프** — `createdAt`/`updatedAt`은 `DateTime @db.Timestamptz @map("created_at"/"updated_at")`. `createdAt`은 `@default(now())`, `updatedAt`은 `@updatedAt`.
   - 예외: 불변(append-only) 스냅샷 테이블은 `updatedAt`을 두지 않는다. `PurchaseOrderVersion`이 그 예로, `createdAt`만 가진다. DDL에 `updated_at`이 없으면 임의로 추가하지 말 것.
 - **네이밍** — 필드명은 camelCase, DB 컬럼은 snake_case `@map`. 테이블명은 snake_case `@@map`(이 스키마는 복수형/단수형이 혼재 — DDL 원본을 따른다).
@@ -55,7 +55,7 @@ ChangeRequest ──< PurchaseOrderVersion   (이 변경요청이 만든 버전,
 - **PostgreSQL 타입 매핑**
   - 짧은 문자열: `String @db.VarChar(n)` — 길이 제한이 필요하면 반드시 `@db.VarChar`.
   - 긴 텍스트: `String @db.Text`.
-  - 정수: `Int`(4B) / `BigInt`(8B, PK·FK).
+  - 정수: `Int`(4B). PK·FK 포함.
   - 금액·소수: `Decimal @db.Decimal(p, s)`. **`Float` 금지**(부동소수점 오차).
   - 날짜+시간: `DateTime @db.Timestamptz`. **`@db.Timestamp`(시간대 없음) 금지**.
   - 날짜만: `DateTime @db.Date`.

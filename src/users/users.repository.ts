@@ -10,7 +10,7 @@ export class UsersRepository {
     return this.prisma.user.create({ data });
   }
 
-  async findById(id: bigint): Promise<User | null> {
+  async findById(id: number): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
@@ -18,7 +18,7 @@ export class UsersRepository {
     return this.prisma.user.findMany();
   }
 
-  async delete(id: bigint): Promise<User> {
+  async delete(id: number): Promise<User> {
     return this.prisma.user.delete({ where: { id } });
   }
 }

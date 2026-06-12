@@ -17,7 +17,7 @@ describe('UsersController', () => {
   };
 
   const mockResponse: UserResponseDto = {
-    id: '1',
+    id: 1,
     name: '홍길동',
     role: UserRole.BUYER,
     createdAt: new Date('2026-01-01T00:00:00Z'),

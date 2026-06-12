@@ -17,7 +17,7 @@ describe('UsersService', () => {
   };
 
   const mockEntity: User = {
-    id: 1n,
+    id: 1,
     name: '홍길동',
     role: UserRole.BUYER,
     createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -51,21 +51,21 @@ describe('UsersService', () => {
         role: 'BUYER',
       });
       expect(result).toBeInstanceOf(UserResponseDto);
-      expect(result.id).toBe('1');
+      expect(result.id).toBe(1);
       expect(result.name).toBe('홍길동');
       expect(result.role).toBe('BUYER');
     });
   });
 
   describe('find', () => {
-    it('존재하는 id면 BigInt로 변환해 조회하고 ResponseDto를 반환한다', async () => {
+    it('존재하는 id면 number로 변환해 조회하고 ResponseDto를 반환한다', async () => {
       repository.findById.mockResolvedValue(mockEntity);
 
       const result = await service.find('1');
 
-      expect(repository.findById).toHaveBeenCalledWith(1n);
+      expect(repository.findById).toHaveBeenCalledWith(1);
       expect(result).toBeInstanceOf(UserResponseDto);
-      expect(result.id).toBe('1');
+      expect(result.id).toBe(1);
     });
 
     it('존재하지 않으면 NotFoundException을 던진다', async () => {
@@ -80,7 +80,7 @@ describe('UsersService', () => {
     it('전체 목록을 ResponseDto 배열로 변환해 반환한다', async () => {
       repository.findMany.mockResolvedValue([
         mockEntity,
-        { ...mockEntity, id: 2n, name: '김철수' },
+        { ...mockEntity, id: 2, name: '김철수' },
       ]);
 
       const result = await service.findMany();
@@ -88,8 +88,8 @@ describe('UsersService', () => {
       expect(repository.findMany).toHaveBeenCalled();
       expect(result).toHaveLength(2);
       expect(result[0]).toBeInstanceOf(UserResponseDto);
-      expect(result[0].id).toBe('1');
-      expect(result[1].id).toBe('2');
+      expect(result[0].id).toBe(1);
+      expect(result[1].id).toBe(2);
     });
 
     it('데이터가 없으면 빈 배열을 반환한다', async () => {
@@ -108,8 +108,8 @@ describe('UsersService', () => {
 
       const result = await service.delete('1');
 
-      expect(repository.findById).toHaveBeenCalledWith(1n);
-      expect(repository.delete).toHaveBeenCalledWith(1n);
+      expect(repository.findById).toHaveBeenCalledWith(1);
+      expect(repository.delete).toHaveBeenCalledWith(1);
       expect(result).toBeUndefined();
     });
 

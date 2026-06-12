@@ -20,7 +20,7 @@
 - 데이터 접근은 Repository에 위임, 직접 Prisma 사용 금지
 - 리소스 존재 여부 확인 후 없으면 `NotFoundException` 던지기
 - 엔티티를 ResponseDto로 변환할 때 `ResponseDto.fromEntity()` 정적 메서드 사용
-- BigInt ID는 `BigInt(id)` 변환 후 Repository에 전달
+- ID는 number다. `@Param('id')`로 받은 문자열은 `Number(id)`로 변환 후 Repository에 전달
 
 ### Repository
 

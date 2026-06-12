@@ -56,7 +56,7 @@ describe('UsersRepository', () => {
     });
 
     it('존재하지 않는 id면 null을 반환한다', async () => {
-      const found = await repository.findById(999999n);
+      const found = await repository.findById(999999);
 
       expect(found).toBeNull();
     });

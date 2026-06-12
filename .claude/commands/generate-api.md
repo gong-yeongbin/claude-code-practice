@@ -35,10 +35,24 @@
 3. 확인 후 해당 파일만 수정한다. spec 파일도 함께 갱신한다.
 4. `pnpm test -- src/<첫 번째 인자> --coverage`를 실행해 기존 테스트가 깨지지 않는지 확인한다.
 
+### 0.5단계: 엔드포인트 범위 도출 (필수)
+
+**이 스킬은 CRUD 골격을 자동으로 만들지 않는다. 두 번째 인자에서 도출한 엔드포인트만 만든다.**
+
+두 번째 인자를 분석해 실제로 필요한 엔드포인트 집합을 도출한다.
+
+- 설명에 특정 동작이 명시되면 그것만 만든다. 예를 들어 "생성하는 엔드포인트"면 `@Post()` 하나만, "주문 상태를 변경하는 PATCH"면 `@Patch(':id')` 하나만 만든다.
+- 명시되지 않은 엔드포인트(조회·삭제 등)는 **임의로 추가하지 않는다.** "패턴 유지", "골격 완성"을 이유로 요청 범위를 넘기지 않는다.
+- 두 번째 인자가 `"신규"`처럼 엔드포인트를 특정하지 않으면, 코딩을 시작하기 전에 `AskUserQuestion`으로 어떤 엔드포인트가 필요한지 물어본다. 추측해서 CRUD 전체를 만들지 않는다.
+
+도출한 엔드포인트 목록을 사용자에게 한 줄로 안내한 뒤 1단계로 진행한다. 이후 모든 단계(spec, 구현, http)는 **이 목록에 있는 엔드포인트에 한정**해 작성한다.
+
 ### 1단계: Spec 파일 3개 작성
 
 **커버리지 목표: statements/branches/functions/lines 모두 90% 이상.**
 4단계에서 `--coverage`로 측정하며, 미달 시 테스트를 보강한 뒤 재실행한다.
+
+spec은 **0.5단계에서 도출한 엔드포인트에 한정**해 작성한다. 도출되지 않은 메서드의 테스트는 작성하지 않는다.
 
 테스트 케이스를 작성하기 전에 두 번째 인자를 분석해 다음을 파악한다.
 - 추가/수정되는 메서드 목록과 시그니처
@@ -57,7 +71,7 @@
 #### `src/$ARGUMENTS/$ARGUMENTS.service.spec.ts`
 
 - Repository를 `jest.fn()`으로 mock
-- 공통 픽스처: `const mockEntity = { id: 1n, createdAt: new Date(), updatedAt: new Date() } as any`
+- 공통 픽스처: `const mockEntity = { id: 1, createdAt: new Date(), updatedAt: new Date() } as any`
 - 파악한 서비스 메서드별로 정상/예외 경로를 각각 케이스로 작성한다.
   - 정상: repository 메서드 호출 순서와 반환값(ResponseDto 변환 포함) 확인
   - 예외: repository가 `null` 반환 시 적절한 예외(`NotFoundException` 등) throw 확인
@@ -94,19 +108,20 @@ pnpm test -- src/$ARGUMENTS
 - Service를 exports에 등록
 
 **`src/$ARGUMENTS/$ARGUMENTS.controller.ts`**
-- `@Post()`, `@Get()`, `@Get(':id')`, `@Delete(':id')` 핸들러
-- DELETE에 `@HttpCode(204)` 명시
+- **0.5단계에서 도출한 엔드포인트의 핸들러만** 작성한다. 도출되지 않은 핸들러는 만들지 않는다.
+- 참고용 핸들러 시그니처. 생성 `@Post()`, 전체 조회 `@Get()`, 단건 조회 `@Get(':id')`, 삭제 `@Delete(':id')`.
+- DELETE를 만드는 경우에만 `@HttpCode(204)`를 명시한다.
 - 비즈니스 로직 없이 Service 위임만 담당
 
 **`src/$ARGUMENTS/$ARGUMENTS.service.ts`**
-- create, find, findMany, delete 메서드 (모두 async)
-- find에서 entity 없으면 `NotFoundException` throw
+- **도출한 엔드포인트가 호출하는 메서드만** 작성한다 (모두 async). 예를 들어 생성만 도출됐으면 `create`만 만든다.
+- find 계열을 만드는 경우 entity 없으면 `NotFoundException` throw
 - entity → ResponseDto 변환은 `XxxResponseDto.fromEntity()` 사용
-- BigInt ID 변환: `BigInt(id)`
+- id는 number다. `@Param('id')`로 받은 문자열은 `Number(id)` 또는 `ParseIntPipe`로 변환한다.
 
 **`src/$ARGUMENTS/$ARGUMENTS.repository.ts`**
-- `create(data: Prisma.XxxCreateInput)` 타입 사용
-- findById, findMany, delete — Prisma 표준 메서드 그대로
+- **Service가 실제로 호출하는 메서드만** 작성한다. 사용하지 않는 메서드는 만들지 않는다.
+- 생성 `create(data: Prisma.XxxCreateInput)`, 단건 조회 `findById`, 전체 조회 `findMany`, 삭제 `delete` — Prisma 표준 메서드 그대로
 
 **`src/$ARGUMENTS/dto/create-{단수}.dto.ts`**
 - 두 번째 인자에서 파악한 도메인 필드를 실제로 작성한다.
@@ -114,7 +129,7 @@ pnpm test -- src/$ARGUMENTS
 - 도메인 필드를 파악하기 어려우면 `// TODO: 도메인 필드를 추가하고 적절한 검증 데코레이터를 적용하세요` 주석만 남긴다.
 
 **`src/$ARGUMENTS/dto/{단수}-response.dto.ts`**
-- `id: string`, `createdAt: Date`, `updatedAt: Date` 기본 필드
+- `id: number`, `createdAt: Date`, `updatedAt: Date` 기본 필드
 - 두 번째 인자에서 파악한 도메인 필드를 실제로 작성한다.
 - `static fromEntity(entity: Xxx): XxxResponseDto` 정적 메서드에서 도메인 필드도 매핑한다.
 - 도메인 필드를 파악하기 어려우면 `// TODO: 도메인 필드를 추가하세요` 주석만 남긴다.
@@ -138,8 +153,8 @@ pnpm test -- src/$ARGUMENTS --coverage
 
 등록이 완료되면 `http/$ARGUMENTS.http`를 생성한다. `http/CLAUDE.md`의 패턴을 따른다.
 - 첫 줄에 해당 리소스의 역할을 설명하는 한 줄짜리 한국어 주석을 단다.
-- 컨트롤러의 엔드포인트별로 `###` 요청을 작성한다 (생성/전체 조회/단건 조회/삭제 등).
-- 전체 조회에서 응답 핸들러 스크립트로 첫 항목 id를 전역 변수에 저장하고, 단건 조회·삭제에서 그 변수를 참조한다.
+- **컨트롤러에 실제로 만든 엔드포인트만** `###` 요청으로 작성한다. 만들지 않은 엔드포인트의 요청은 넣지 않는다.
+- 전체 조회와 단건 조회·삭제를 모두 만든 경우에만, 전체 조회에서 응답 핸들러 스크립트로 첫 항목 id를 전역 변수에 저장하고 단건 조회·삭제에서 그 변수를 참조한다.
 - 응답 본문 참조 시 `data` 래핑을 고려한다 (목록은 `data[0].id`, 단건은 `data.id`).
 - 생성 요청 본문에는 DTO 도메인 필드를 채운다. 파악이 어려우면 `// TODO` 주석으로 남긴다.
 

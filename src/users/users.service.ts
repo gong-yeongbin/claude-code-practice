@@ -16,7 +16,7 @@ export class UsersService {
   }
 
   async find(id: string): Promise<UserResponseDto> {
-    const user = await this.usersRepository.findById(BigInt(id));
+    const user = await this.usersRepository.findById(Number(id));
     if (!user) {
       throw new NotFoundException(`User ${id} not found`);
     }
@@ -30,6 +30,6 @@ export class UsersService {
 
   async delete(id: string): Promise<void> {
     await this.find(id);
-    await this.usersRepository.delete(BigInt(id));
+    await this.usersRepository.delete(Number(id));
   }
 }
