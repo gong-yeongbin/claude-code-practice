@@ -82,9 +82,7 @@ describe('UsersController', () => {
     });
 
     it('service가 던진 예외를 그대로 전파한다', async () => {
-      service.find.mockRejectedValue(
-        new NotFoundException('User 999 not found'),
-      );
+      service.find.mockRejectedValue(new NotFoundException('User 999 not found'));
 
       await expect(controller.find('999')).rejects.toThrow(NotFoundException);
     });
@@ -101,9 +99,7 @@ describe('UsersController', () => {
     });
 
     it('service가 던진 예외를 그대로 전파한다', async () => {
-      service.delete.mockRejectedValue(
-        new NotFoundException('User 999 not found'),
-      );
+      service.delete.mockRejectedValue(new NotFoundException('User 999 not found'));
 
       await expect(controller.delete('999')).rejects.toThrow(NotFoundException);
     });

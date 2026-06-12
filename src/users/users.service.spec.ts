@@ -33,10 +33,7 @@ describe('UsersService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        UsersService,
-        { provide: UsersRepository, useValue: repository },
-      ],
+      providers: [UsersService, { provide: UsersRepository, useValue: repository }],
     }).compile();
 
     service = module.get<UsersService>(UsersService);

@@ -34,9 +34,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         error = body.error as string | undefined;
       }
     } else {
-      this.logger.error(
-        exception instanceof Error ? exception.stack : String(exception),
-      );
+      this.logger.error(exception instanceof Error ? exception.stack : String(exception));
     }
 
     const body: ApiResponse<never> = {
