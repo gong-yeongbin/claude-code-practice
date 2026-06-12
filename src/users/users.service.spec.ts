@@ -78,10 +78,7 @@ describe('UsersService', () => {
 
   describe('findMany', () => {
     it('전체 목록을 ResponseDto 배열로 변환해 반환한다', async () => {
-      repository.findMany.mockResolvedValue([
-        mockEntity,
-        { ...mockEntity, id: 2, name: '김철수' },
-      ]);
+      repository.findMany.mockResolvedValue([mockEntity, { ...mockEntity, id: 2, name: '김철수' }]);
 
       const result = await service.findMany();
 
