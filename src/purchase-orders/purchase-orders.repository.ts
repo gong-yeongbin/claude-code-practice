@@ -44,4 +44,22 @@ export class PurchaseOrdersRepository {
       return { ...order, currentVersionData: version };
     });
   }
+
+  async findById(id: number): Promise<PurchaseOrderWithVersion | null> {
+    const order = await this.prisma.purchaseOrder.findUnique({ where: { id } });
+    if (!order) {
+      return null;
+    }
+
+    const version = await this.prisma.purchaseOrderVersion.findUnique({
+      where: {
+        purchaseOrderId_versionNo: {
+          purchaseOrderId: order.id,
+          versionNo: order.currentVersion,
+        },
+      },
+    });
+
+    return { ...order, currentVersionData: version! };
+  }
 }

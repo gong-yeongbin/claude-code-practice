@@ -75,4 +75,27 @@ describe('PurchaseOrdersRepository', () => {
       expect(po.currentVersionData.spec).toBeNull();
     });
   });
+
+  describe('findById', () => {
+    it('현재 버전 스냅샷을 합쳐 발주서를 반환한다', async () => {
+      const input = baseInput();
+      const created = await repository.create(input);
+
+      const found = await repository.findById(created.id);
+
+      expect(found).not.toBeNull();
+      expect(found!.id).toBe(created.id);
+      expect(found!.orderNo).toBe(input.orderNo);
+      expect(found!.currentVersion).toBe(1);
+      expect(found!.currentVersionData.versionNo).toBe(1);
+      expect(found!.currentVersionData.productName).toBe('코튼 티셔츠');
+      expect(found!.currentVersionData.unitPrice.toString()).toBe('5500');
+    });
+
+    it('존재하지 않는 id면 null을 반환한다', async () => {
+      const found = await repository.findById(999999);
+
+      expect(found).toBeNull();
+    });
+  });
 });

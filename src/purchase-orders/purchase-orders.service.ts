@@ -1,5 +1,5 @@
 // 발주서 생성 비즈니스 로직. orderNo 채번과 ResponseDto 변환을 담당
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersRepository } from './purchase-orders.repository';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
@@ -19,6 +19,14 @@ export class PurchaseOrdersService {
       deliveryDate: new Date(dto.deliveryDate),
       spec: dto.spec as Prisma.InputJsonValue | undefined,
     });
+    return PurchaseOrderResponseDto.fromEntity(order);
+  }
+
+  async find(id: string): Promise<PurchaseOrderResponseDto> {
+    const order = await this.purchaseOrdersRepository.findById(Number(id));
+    if (!order) {
+      throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
     return PurchaseOrderResponseDto.fromEntity(order);
   }
 

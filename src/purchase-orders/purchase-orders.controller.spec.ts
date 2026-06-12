@@ -1,6 +1,6 @@
 // PurchaseOrdersController의 생성 핸들러가 Service에 올바르게 위임하는지 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
@@ -11,6 +11,7 @@ describe('PurchaseOrdersController', () => {
   let controller: PurchaseOrdersController;
   let service: {
     create: jest.Mock;
+    find: jest.Mock;
   };
 
   const mockResponse: PurchaseOrderResponseDto = {
@@ -31,6 +32,7 @@ describe('PurchaseOrdersController', () => {
   beforeEach(async () => {
     service = {
       create: jest.fn(),
+      find: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -64,6 +66,23 @@ describe('PurchaseOrdersController', () => {
       service.create.mockRejectedValue(new BadRequestException('invalid'));
 
       await expect(controller.create(dto)).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('find', () => {
+    it('id를 service.find에 전달하고 결과를 반환한다', async () => {
+      service.find.mockResolvedValue(mockResponse);
+
+      const result = await controller.find('1');
+
+      expect(service.find).toHaveBeenCalledWith('1');
+      expect(result).toBe(mockResponse);
+    });
+
+    it('service가 던진 예외를 그대로 전파한다', async () => {
+      service.find.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
+
+      await expect(controller.find('999')).rejects.toThrow(NotFoundException);
     });
   });
 });

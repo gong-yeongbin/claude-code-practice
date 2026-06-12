@@ -15,7 +15,7 @@ Content-Type: application/json
     client.global.set("buyerId", response.body.data.id);
 %}
 
-### 발주서 생성 (저장된 buyerId 사용)
+### 발주서 생성 (저장된 buyerId 사용, 생성된 id를 purchaseOrderId 전역 변수에 저장)
 POST {{host}}/purchase-orders
 Content-Type: application/json
 
@@ -30,3 +30,11 @@ Content-Type: application/json
     "size": "L"
   }
 }
+
+> {%
+    client.global.set("purchaseOrderId", response.body.data.id);
+%}
+
+### 발주서 단건 조회 (저장된 purchaseOrderId 사용)
+GET {{host}}/purchase-orders/{{purchaseOrderId}}
+Accept: application/json

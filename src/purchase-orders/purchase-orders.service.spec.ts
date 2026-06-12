@@ -1,5 +1,6 @@
 // PurchaseOrdersService의 생성 로직을 Repository mock 기반으로 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PurchaseOrdersRepository, CreatePurchaseOrderInput } from './purchase-orders.repository';
 import {
@@ -13,6 +14,7 @@ describe('PurchaseOrdersService', () => {
   let service: PurchaseOrdersService;
   let repository: {
     create: jest.Mock<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>;
+    findById: jest.Mock<Promise<PurchaseOrderWithVersion | null>, [number]>;
   };
 
   const mockEntity: PurchaseOrderWithVersion = {
@@ -42,6 +44,7 @@ describe('PurchaseOrdersService', () => {
   beforeEach(async () => {
     repository = {
       create: jest.fn<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>(),
+      findById: jest.fn<Promise<PurchaseOrderWithVersion | null>, [number]>(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -111,6 +114,30 @@ describe('PurchaseOrdersService', () => {
       const arg = repository.create.mock.calls[0][0];
       expect(arg.spec).toBeUndefined();
       expect(result.spec).toBeNull();
+    });
+  });
+
+  describe('find', () => {
+    it('존재하는 id면 number로 변환해 조회하고 ResponseDto를 반환한다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+
+      const result = await service.find('1');
+
+      expect(repository.findById).toHaveBeenCalledWith(1);
+      expect(result).toBeInstanceOf(PurchaseOrderResponseDto);
+      expect(result.id).toBe(1);
+      expect(result.orderNo).toBe('PO-20260101-0001');
+      expect(result.currentVersion).toBe(1);
+      expect(result.productName).toBe('코튼 티셔츠');
+      expect(result.unitPrice).toBe('5500');
+      expect(result.spec).toEqual({ color: '블랙', size: 'L' });
+    });
+
+    it('존재하지 않으면 NotFoundException을 던진다', async () => {
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.find('999')).rejects.toThrow(NotFoundException);
+      await expect(service.find('999')).rejects.toThrow('PurchaseOrder 999 not found');
     });
   });
 });
