@@ -46,16 +46,21 @@ Content-Type: application/json
 %}
 
 ### 발주서 변경 요청 생성 (생성된 변경요청 id를 changeRequestId 전역 변수에 저장)
+# changes 키는 snake_case(product_name/quantity/unit_price/delivery_date/spec)이며 각 값의 new가 적용된다.
 POST {{host}}/purchase-orders/{{purchaseOrderId}}/change-requests
 Content-Type: application/json
 
 {
   "requesterId": {{buyerId}},
-  "reason": "수량을 늘려야 합니다",
+  "reason": "수량을 늘리고 납기를 미뤄야 합니다",
   "changes": {
     "quantity": {
       "old": 1000,
       "new": 1500
+    },
+    "delivery_date": {
+      "old": "2026-03-15",
+      "new": "2026-03-25"
     }
   }
 }
@@ -64,7 +69,7 @@ Content-Type: application/json
     client.global.set("changeRequestId", response.body.data.id);
 %}
 
-### 변경 요청 승인 (저장된 changeRequestId/reviewerId 사용, 검토 의견은 선택)
+### 변경 요청 승인 (승인 시 changes를 적용한 새 버전을 만들고 발주서에 반영, 검토 의견은 선택)
 PATCH {{host}}/change-requests/{{changeRequestId}}
 Content-Type: application/json
 
@@ -73,6 +78,10 @@ Content-Type: application/json
   "reviewerId": {{reviewerId}},
   "reviewComment": "검토 결과 승인합니다"
 }
+
+### 승인 결과 확인 (발주서를 재조회해 currentVersion 증가와 변경 내용 반영을 확인)
+GET {{host}}/purchase-orders/{{purchaseOrderId}}
+Accept: application/json
 
 ### 변경 요청 반려 (반려 시 reviewComment 필수)
 # 위 승인을 이미 실행했다면 같은 변경요청은 PENDING이 아니므로 409(Conflict)가 난다.

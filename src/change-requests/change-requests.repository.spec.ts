@@ -26,6 +26,7 @@ describe('ChangeRequestsRepository', () => {
   });
 
   afterEach(async () => {
+    await prisma.purchaseOrderVersion.deleteMany({ where: { purchaseOrderId: { in: orderIds } } });
     await prisma.changeRequest.deleteMany({ where: { id: { in: changeRequestIds } } });
     await prisma.purchaseOrder.deleteMany({ where: { id: { in: orderIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -44,13 +45,24 @@ describe('ChangeRequestsRepository', () => {
     return user;
   }
 
-  // 변경 요청 1건을 위해 필요한 선행 데이터(주문자·발주서)를 만들고 PENDING 변경요청을 생성
-  async function seedChangeRequest() {
+  // 발주서 + v1 버전 + PENDING 변경요청을 만들어 승인 처리의 선행 상태를 구성한다
+  async function seedScenario() {
     const requester = await createUser('주문자', UserRole.BUYER);
     const order = await prisma.purchaseOrder.create({
       data: { orderNo: `PO-CR-${Date.now()}-${Math.random()}`, buyerId: requester.id },
     });
     orderIds.push(order.id);
+    const v1 = await prisma.purchaseOrderVersion.create({
+      data: {
+        purchaseOrderId: order.id,
+        versionNo: 1,
+        productName: '코튼 티셔츠',
+        quantity: 1000,
+        unitPrice: '5500.00',
+        deliveryDate: new Date('2026-03-15'),
+        validFrom: order.createdAt,
+      },
+    });
     const changeRequest = await prisma.changeRequest.create({
       data: {
         purchaseOrderId: order.id,
@@ -60,17 +72,17 @@ describe('ChangeRequestsRepository', () => {
       },
     });
     changeRequestIds.push(changeRequest.id);
-    return changeRequest;
+    return { order, v1, changeRequest };
   }
 
   describe('findById', () => {
     it('존재하는 id면 ChangeRequest를 반환한다', async () => {
-      const created = await seedChangeRequest();
+      const { changeRequest } = await seedScenario();
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(changeRequest.id);
 
       expect(found).not.toBeNull();
-      expect(found?.id).toBe(created.id);
+      expect(found?.id).toBe(changeRequest.id);
       expect(found?.status).toBe(ChangeRequestStatus.PENDING);
     });
 
@@ -81,38 +93,85 @@ describe('ChangeRequestsRepository', () => {
     });
   });
 
+  describe('findCurrentVersion', () => {
+    it('validTo가 NULL인 현재 유효 버전을 반환한다', async () => {
+      const { order } = await seedScenario();
+
+      const current = await repository.findCurrentVersion(order.id);
+
+      expect(current).not.toBeNull();
+      expect(current?.versionNo).toBe(1);
+      expect(current?.validTo).toBeNull();
+    });
+
+    it('버전이 없으면 null을 반환한다', async () => {
+      const current = await repository.findCurrentVersion(999999);
+
+      expect(current).toBeNull();
+    });
+  });
+
   describe('updateReview', () => {
-    it('승인 상태와 검토자·의견·검토시각을 기록한다', async () => {
-      const created = await seedChangeRequest();
+    it('반려 상태와 검토자·의견을 기록한다', async () => {
+      const { changeRequest } = await seedScenario();
+      const reviewer = await createUser('소싱', UserRole.SOURCING);
+
+      const updated = await repository.updateReview(changeRequest.id, {
+        status: ChangeRequestStatus.REJECTED,
+        reviewerId: reviewer.id,
+        reviewComment: '근거가 부족합니다',
+        reviewedAt: new Date(),
+      });
+
+      expect(updated.status).toBe(ChangeRequestStatus.REJECTED);
+      expect(updated.reviewerId).toBe(reviewer.id);
+      expect(updated.reviewComment).toBe('근거가 부족합니다');
+    });
+  });
+
+  describe('applyApproval', () => {
+    it('이전 버전을 마감하고 새 버전을 만들며 발주서와 변경요청을 갱신한다', async () => {
+      const { order, v1, changeRequest } = await seedScenario();
       const reviewer = await createUser('소싱', UserRole.SOURCING);
       const reviewedAt = new Date();
 
-      const updated = await repository.updateReview(created.id, {
-        status: ChangeRequestStatus.APPROVED,
+      const updated = await repository.applyApproval({
+        changeRequestId: changeRequest.id,
+        purchaseOrderId: order.id,
+        nextVersionNo: 2,
+        nextVersion: {
+          productName: '코튼 티셔츠',
+          quantity: 1500,
+          unitPrice: '5500.00',
+          deliveryDate: new Date('2026-03-15'),
+          spec: undefined,
+        },
         reviewerId: reviewer.id,
         reviewComment: '승인합니다',
         reviewedAt,
       });
 
+      // 변경요청 승인 기록
       expect(updated.status).toBe(ChangeRequestStatus.APPROVED);
       expect(updated.reviewerId).toBe(reviewer.id);
       expect(updated.reviewComment).toBe('승인합니다');
-      expect(updated.reviewedAt?.getTime()).toBe(reviewedAt.getTime());
-    });
 
-    it('반려 시 의견 없이 null로도 기록할 수 있다', async () => {
-      const created = await seedChangeRequest();
-      const reviewer = await createUser('소싱', UserRole.SOURCING);
+      // 이전 버전(v1) 마감
+      const closed = await prisma.purchaseOrderVersion.findUnique({ where: { id: v1.id } });
+      expect(closed?.validTo).not.toBeNull();
 
-      const updated = await repository.updateReview(created.id, {
-        status: ChangeRequestStatus.REJECTED,
-        reviewerId: reviewer.id,
-        reviewComment: null,
-        reviewedAt: new Date(),
+      // 새 버전(v2) 생성 + changes 적용
+      const v2 = await prisma.purchaseOrderVersion.findUnique({
+        where: { purchaseOrderId_versionNo: { purchaseOrderId: order.id, versionNo: 2 } },
       });
+      expect(v2).not.toBeNull();
+      expect(v2?.quantity).toBe(1500);
+      expect(v2?.changeRequestId).toBe(changeRequest.id);
+      expect(v2?.validTo).toBeNull();
 
-      expect(updated.status).toBe(ChangeRequestStatus.REJECTED);
-      expect(updated.reviewComment).toBeNull();
+      // 발주서에 승인된 버전 적용
+      const reloaded = await prisma.purchaseOrder.findUnique({ where: { id: order.id } });
+      expect(reloaded?.currentVersion).toBe(2);
     });
   });
 });
