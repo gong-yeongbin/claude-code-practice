@@ -24,6 +24,7 @@ describe('PurchaseOrdersService', () => {
     create: jest.Mock<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>;
     findById: jest.Mock<Promise<PurchaseOrderWithVersion | null>, [number]>;
     createChangeRequest: jest.Mock<Promise<ChangeRequest>, [CreateChangeRequestInput]>;
+    findApprovalHistories: jest.Mock<Promise<ChangeRequest[]>, [number]>;
   };
 
   const mockEntity: PurchaseOrderWithVersion = {
@@ -69,6 +70,7 @@ describe('PurchaseOrdersService', () => {
       create: jest.fn<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>(),
       findById: jest.fn<Promise<PurchaseOrderWithVersion | null>, [number]>(),
       createChangeRequest: jest.fn<Promise<ChangeRequest>, [CreateChangeRequestInput]>(),
+      findApprovalHistories: jest.fn<Promise<ChangeRequest[]>, [number]>(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -162,6 +164,55 @@ describe('PurchaseOrdersService', () => {
 
       await expect(service.find('999')).rejects.toThrow(NotFoundException);
       await expect(service.find('999')).rejects.toThrow('PurchaseOrder 999 not found');
+    });
+  });
+
+  describe('findApprovalHistories', () => {
+    const mockApprovedCr: ChangeRequest = {
+      id: 5,
+      purchaseOrderId: 1,
+      requesterId: 10,
+      reason: '수량을 늘려야 합니다',
+      changes: { quantity: { old: 1000, new: 1500 } },
+      status: ChangeRequestStatus.APPROVED,
+      reviewerId: 20,
+      reviewComment: '승인합니다',
+      reviewedAt: new Date('2026-01-03T00:00:00Z'),
+      createdAt: new Date('2026-01-02T00:00:00Z'),
+      updatedAt: new Date('2026-01-03T00:00:00Z'),
+    };
+
+    it('발주서가 존재하면 APPROVED 이력 목록을 DTO 배열로 반환한다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.findApprovalHistories.mockResolvedValue([mockApprovedCr]);
+
+      const result = await service.findApprovalHistories('1');
+
+      expect(repository.findById).toHaveBeenCalledWith(1);
+      expect(repository.findApprovalHistories).toHaveBeenCalledWith(1);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBeInstanceOf(ChangeRequestResponseDto);
+      expect(result[0].id).toBe(5);
+      expect(result[0].status).toBe(ChangeRequestStatus.APPROVED);
+    });
+
+    it('승인 이력이 없으면 빈 배열을 반환한다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.findApprovalHistories.mockResolvedValue([]);
+
+      const result = await service.findApprovalHistories('1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('발주서가 존재하지 않으면 NotFoundException을 던지고 이력을 조회하지 않는다', async () => {
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.findApprovalHistories('999')).rejects.toThrow(NotFoundException);
+      await expect(service.findApprovalHistories('999')).rejects.toThrow(
+        'PurchaseOrder 999 not found',
+      );
+      expect(repository.findApprovalHistories).not.toHaveBeenCalled();
     });
   });
 

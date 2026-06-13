@@ -20,6 +20,11 @@ export class PurchaseOrdersController {
     return this.purchaseOrdersService.find(id);
   }
 
+  @Get(':id/approval-histories')
+  async findApprovalHistories(@Param('id') id: string): Promise<ChangeRequestResponseDto[]> {
+    return this.purchaseOrdersService.findApprovalHistories(id);
+  }
+
   @Post(':id/change-requests')
   async requestChange(
     @Param('id') id: string,

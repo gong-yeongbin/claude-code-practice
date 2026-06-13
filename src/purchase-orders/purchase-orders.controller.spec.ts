@@ -15,6 +15,7 @@ describe('PurchaseOrdersController', () => {
     create: jest.Mock;
     find: jest.Mock;
     requestChange: jest.Mock;
+    findApprovalHistories: jest.Mock;
   };
 
   const mockResponse: PurchaseOrderResponseDto = {
@@ -51,6 +52,7 @@ describe('PurchaseOrdersController', () => {
       create: jest.fn(),
       find: jest.fn(),
       requestChange: jest.fn(),
+      findApprovalHistories: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -101,6 +103,41 @@ describe('PurchaseOrdersController', () => {
       service.find.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
       await expect(controller.find('999')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findApprovalHistories', () => {
+    const mockHistories: ChangeRequestResponseDto[] = [
+      {
+        id: 5,
+        purchaseOrderId: 1,
+        requesterId: 10,
+        reason: '수량을 늘려야 합니다',
+        changes: { quantity: { old: 1000, new: 1500 } },
+        status: ChangeRequestStatus.APPROVED,
+        reviewerId: 20,
+        reviewComment: '승인합니다',
+        reviewedAt: new Date('2026-01-03T00:00:00Z'),
+        createdAt: new Date('2026-01-02T00:00:00Z'),
+        updatedAt: new Date('2026-01-03T00:00:00Z'),
+      },
+    ];
+
+    it('id를 service.findApprovalHistories에 전달하고 결과를 반환한다', async () => {
+      service.findApprovalHistories.mockResolvedValue(mockHistories);
+
+      const result = await controller.findApprovalHistories('1');
+
+      expect(service.findApprovalHistories).toHaveBeenCalledWith('1');
+      expect(result).toBe(mockHistories);
+    });
+
+    it('service가 던진 예외를 그대로 전파한다', async () => {
+      service.findApprovalHistories.mockRejectedValue(
+        new NotFoundException('PurchaseOrder 999 not found'),
+      );
+
+      await expect(controller.findApprovalHistories('999')).rejects.toThrow(NotFoundException);
     });
   });
 

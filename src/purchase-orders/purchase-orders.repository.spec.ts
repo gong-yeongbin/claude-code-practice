@@ -3,7 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { PurchaseOrdersRepository, CreatePurchaseOrderInput } from './purchase-orders.repository';
-import { UserRole } from '../../generated/prisma/client';
+import { ChangeRequestStatus, UserRole } from '../../generated/prisma/client';
 
 describe('PurchaseOrdersRepository', () => {
   let repository: PurchaseOrdersRepository;
@@ -97,6 +97,75 @@ describe('PurchaseOrdersRepository', () => {
       const found = await repository.findById(999999);
 
       expect(found).toBeNull();
+    });
+  });
+
+  describe('findApprovalHistories', () => {
+    it('APPROVED 상태의 변경 요청만 createdAt 오름차순으로 반환한다', async () => {
+      const po = await repository.create(baseInput());
+
+      const cr1 = await prisma.changeRequest.create({
+        data: {
+          purchaseOrderId: po.id,
+          requesterId: buyerId,
+          reason: '첫 번째 승인',
+          changes: { test: 1 },
+          status: ChangeRequestStatus.APPROVED,
+          createdAt: new Date('2026-01-01T00:00:00Z'),
+        },
+      });
+      const cr2 = await prisma.changeRequest.create({
+        data: {
+          purchaseOrderId: po.id,
+          requesterId: buyerId,
+          reason: '두 번째 승인',
+          changes: { test: 2 },
+          status: ChangeRequestStatus.APPROVED,
+          createdAt: new Date('2026-01-02T00:00:00Z'),
+        },
+      });
+      // PENDING은 제외돼야 함
+      await prisma.changeRequest.create({
+        data: {
+          purchaseOrderId: po.id,
+          requesterId: buyerId,
+          reason: '보류',
+          changes: {},
+          status: ChangeRequestStatus.PENDING,
+        },
+      });
+
+      const result = await repository.findApprovalHistories(po.id);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe(cr1.id);
+      expect(result[1].id).toBe(cr2.id);
+      result.forEach((r) => expect(r.status).toBe(ChangeRequestStatus.APPROVED));
+    });
+
+    it('REJECTED 상태는 제외한다', async () => {
+      const po = await repository.create(baseInput());
+      await prisma.changeRequest.create({
+        data: {
+          purchaseOrderId: po.id,
+          requesterId: buyerId,
+          reason: '반려',
+          changes: {},
+          status: ChangeRequestStatus.REJECTED,
+        },
+      });
+
+      const result = await repository.findApprovalHistories(po.id);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('해당 발주서의 승인 이력이 없으면 빈 배열을 반환한다', async () => {
+      const po = await repository.create(baseInput());
+
+      const result = await repository.findApprovalHistories(po.id);
+
+      expect(result).toHaveLength(0);
     });
   });
 

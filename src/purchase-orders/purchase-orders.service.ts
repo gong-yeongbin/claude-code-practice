@@ -32,6 +32,15 @@ export class PurchaseOrdersService {
     return PurchaseOrderResponseDto.fromEntity(order);
   }
 
+  async findApprovalHistories(id: string): Promise<ChangeRequestResponseDto[]> {
+    const order = await this.purchaseOrdersRepository.findById(Number(id));
+    if (!order) {
+      throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+    const histories = await this.purchaseOrdersRepository.findApprovalHistories(Number(id));
+    return histories.map((h) => ChangeRequestResponseDto.fromEntity(h));
+  }
+
   // 주문자가 특정 발주서에 대한 변경 요청을 생성. 발주서가 없으면 NotFoundException
   async requestChange(id: string, dto: CreateChangeRequestDto): Promise<ChangeRequestResponseDto> {
     const purchaseOrderId = Number(id);
