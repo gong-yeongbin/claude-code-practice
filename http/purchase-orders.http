@@ -65,3 +65,7 @@ Content-Type: application/json
 ### 발주서 시점 스냅샷 조회 (at 시각에 유효했던 버전 반환)
 GET {{host}}/purchase-orders/{{purchaseOrderId}}/snapshot?at=2026-01-15T00:00:00Z
 Accept: application/json
+
+### 발주서 두 버전 비교 (from·to 버전 사이에 바뀐 필드만 반환)
+GET {{host}}/purchase-orders/{{purchaseOrderId}}/diff?from=1&to=2
+Accept: application/json

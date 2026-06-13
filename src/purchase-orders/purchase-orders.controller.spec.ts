@@ -5,6 +5,7 @@ import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
+import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
@@ -19,6 +20,7 @@ describe('PurchaseOrdersController', () => {
     findApprovalHistories: jest.Mock;
     findVersion: jest.Mock;
     findSnapshot: jest.Mock;
+    compareVersions: jest.Mock;
   };
 
   const mockResponse: PurchaseOrderResponseDto = {
@@ -58,6 +60,7 @@ describe('PurchaseOrdersController', () => {
       findApprovalHistories: jest.fn(),
       findVersion: jest.fn(),
       findSnapshot: jest.fn(),
+      compareVersions: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -250,6 +253,40 @@ describe('PurchaseOrdersController', () => {
       await expect(controller.findSnapshot('1', '2025-01-01T00:00:00Z')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('compareVersions', () => {
+    const mockDiffResponse: PurchaseOrderVersionDiffResponseDto = {
+      purchaseOrderId: 1,
+      fromVersion: 1,
+      toVersion: 2,
+      changes: [{ field: 'quantity', old: 1000, new: 1500 }],
+    };
+
+    it('id, from, to를 service.compareVersions에 전달하고 결과를 반환한다', async () => {
+      service.compareVersions.mockResolvedValue(mockDiffResponse);
+
+      const result = await controller.compareVersions('1', '1', '2');
+
+      expect(service.compareVersions).toHaveBeenCalledWith('1', '1', '2');
+      expect(result).toBe(mockDiffResponse);
+    });
+
+    it('발주서가 없으면 service가 던진 NotFoundException을 그대로 전파한다', async () => {
+      service.compareVersions.mockRejectedValue(
+        new NotFoundException('PurchaseOrder 999 not found'),
+      );
+
+      await expect(controller.compareVersions('999', '1', '2')).rejects.toThrow(NotFoundException);
+    });
+
+    it('버전이 없으면 service가 던진 NotFoundException을 그대로 전파한다', async () => {
+      service.compareVersions.mockRejectedValue(
+        new NotFoundException('PurchaseOrder 1 version 99 not found'),
+      );
+
+      await expect(controller.compareVersions('1', '1', '99')).rejects.toThrow(NotFoundException);
     });
   });
 });

@@ -6,6 +6,7 @@ import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
+import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 import { Prisma } from '../../generated/prisma/client';
 
 @Injectable()
@@ -81,6 +82,31 @@ export class PurchaseOrdersService {
       throw new NotFoundException(`PurchaseOrder ${id} has no version at ${at}`);
     }
     return PurchaseOrderVersionResponseDto.fromEntity(version);
+  }
+
+  // 두 버전을 비교해 어떤 필드가 어떻게 바뀌었는지 반환. 발주서/버전 없으면 NotFoundException
+  async compareVersions(
+    id: string,
+    from: string,
+    to: string,
+  ): Promise<PurchaseOrderVersionDiffResponseDto> {
+    const purchaseOrderId = Number(id);
+    const order = await this.purchaseOrdersRepository.findById(purchaseOrderId);
+    if (!order) {
+      throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+
+    const fromVersion = await this.purchaseOrdersRepository.findVersion(purchaseOrderId, Number(from));
+    if (!fromVersion) {
+      throw new NotFoundException(`PurchaseOrder ${id} version ${from} not found`);
+    }
+
+    const toVersion = await this.purchaseOrdersRepository.findVersion(purchaseOrderId, Number(to));
+    if (!toVersion) {
+      throw new NotFoundException(`PurchaseOrder ${id} version ${to} not found`);
+    }
+
+    return PurchaseOrderVersionDiffResponseDto.fromVersions(fromVersion, toVersion);
   }
 
   // 발주 번호 채번. PO-yyyyMMddHHmmss-랜덤4자리로 사람이 읽기 쉬운 번호 생성

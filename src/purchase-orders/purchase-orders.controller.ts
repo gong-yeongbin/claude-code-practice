@@ -6,6 +6,7 @@ import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
+import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 
 @Controller('purchase-orders')
 export class PurchaseOrdersController {
@@ -40,6 +41,15 @@ export class PurchaseOrdersController {
     @Param('versionNo') versionNo: string,
   ): Promise<PurchaseOrderVersionResponseDto> {
     return this.purchaseOrdersService.findVersion(id, versionNo);
+  }
+
+  @Get(':id/diff')
+  async compareVersions(
+    @Param('id') id: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ): Promise<PurchaseOrderVersionDiffResponseDto> {
+    return this.purchaseOrdersService.compareVersions(id, from, to);
   }
 
   @Get(':id/snapshot')

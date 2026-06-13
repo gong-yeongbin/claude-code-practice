@@ -19,6 +19,7 @@ import {
 } from '../../generated/prisma/client';
 import { CreateChangeRequestInput } from './purchase-orders.repository';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
+import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 
 describe('PurchaseOrdersService', () => {
   let service: PurchaseOrdersService;
@@ -372,6 +373,135 @@ describe('PurchaseOrdersService', () => {
       await expect(service.findSnapshot('1', at)).rejects.toThrow(
         `PurchaseOrder 1 has no version at ${at}`,
       );
+    });
+  });
+
+  describe('compareVersions', () => {
+    const v1: PurchaseOrderVersion = {
+      id: 1,
+      purchaseOrderId: 1,
+      versionNo: 1,
+      productName: '코튼 티셔츠',
+      quantity: 1000,
+      unitPrice: new Prisma.Decimal('5500.00'),
+      deliveryDate: new Date('2026-03-15T00:00:00Z'),
+      spec: { color: '블랙', size: 'L' },
+      changeRequestId: null,
+      validFrom: new Date('2026-01-01T00:00:00Z'),
+      validTo: new Date('2026-01-10T00:00:00Z'),
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    };
+    // v2: 모든 도메인 필드가 v1과 다르다 (productName/quantity/unitPrice/deliveryDate/spec)
+    const v2: PurchaseOrderVersion = {
+      ...v1,
+      id: 2,
+      versionNo: 2,
+      productName: '코튼 후드티',
+      quantity: 1500,
+      unitPrice: new Prisma.Decimal('6200.00'),
+      deliveryDate: new Date('2026-03-25T00:00:00Z'),
+      spec: { color: '네이비', size: 'XL' },
+      changeRequestId: 5,
+      validFrom: new Date('2026-01-10T00:00:00Z'),
+      validTo: null,
+    };
+
+    it('발주서가 없으면 NotFoundException을 던지고 버전을 조회하지 않는다', async () => {
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.compareVersions('999', '1', '2')).rejects.toThrow(NotFoundException);
+      await expect(service.compareVersions('999', '1', '2')).rejects.toThrow(
+        'PurchaseOrder 999 not found',
+      );
+      expect(repository.findVersion).not.toHaveBeenCalled();
+    });
+
+    it('from 버전이 없으면 NotFoundException을 던지고 to 버전을 조회하지 않는다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.findVersion.mockResolvedValue(null);
+
+      await expect(service.compareVersions('1', '99', '2')).rejects.toThrow(NotFoundException);
+      await expect(service.compareVersions('1', '99', '2')).rejects.toThrow(
+        'PurchaseOrder 1 version 99 not found',
+      );
+    });
+
+    it('to 버전이 없으면 NotFoundException을 던진다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      // from(1)은 존재, to(99)는 없음 — 인자 기반으로 응답
+      repository.findVersion.mockImplementation((_poId, versionNo) =>
+        Promise.resolve(versionNo === 1 ? v1 : null),
+      );
+
+      await expect(service.compareVersions('1', '1', '99')).rejects.toThrow(NotFoundException);
+      await expect(service.compareVersions('1', '1', '99')).rejects.toThrow(
+        'PurchaseOrder 1 version 99 not found',
+      );
+    });
+
+    it('두 버전을 number로 변환해 조회하고 바뀐 모든 필드를 changes로 반환한다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.findVersion.mockResolvedValueOnce(v1).mockResolvedValueOnce(v2);
+
+      const result = await service.compareVersions('1', '1', '2');
+
+      expect(repository.findById).toHaveBeenCalledWith(1);
+      expect(repository.findVersion).toHaveBeenNthCalledWith(1, 1, 1);
+      expect(repository.findVersion).toHaveBeenNthCalledWith(2, 1, 2);
+
+      expect(result).toBeInstanceOf(PurchaseOrderVersionDiffResponseDto);
+      expect(result.purchaseOrderId).toBe(1);
+      expect(result.fromVersion).toBe(1);
+      expect(result.toVersion).toBe(2);
+
+      const fields = result.changes.map((c) => c.field);
+      expect(fields).toEqual(['productName', 'quantity', 'unitPrice', 'deliveryDate', 'spec']);
+      expect(result.changes).toContainEqual({
+        field: 'quantity',
+        old: 1000,
+        new: 1500,
+      });
+      // unitPrice는 toString으로 정규화된 문자열로 노출
+      expect(result.changes).toContainEqual({
+        field: 'unitPrice',
+        old: '5500',
+        new: '6200',
+      });
+    });
+
+    it('두 버전이 동일하면 changes가 빈 배열이다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.findVersion.mockResolvedValueOnce(v1).mockResolvedValueOnce({ ...v1 });
+
+      const result = await service.compareVersions('1', '1', '1');
+
+      expect(result.changes).toEqual([]);
+    });
+
+    it('spec이 양쪽 모두 null이면 spec 변경으로 잡지 않는다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      const a = { ...v1, spec: null };
+      const b = { ...v1, versionNo: 2, spec: null };
+      repository.findVersion.mockResolvedValueOnce(a).mockResolvedValueOnce(b);
+
+      const result = await service.compareVersions('1', '1', '2');
+
+      expect(result.changes.map((c) => c.field)).not.toContain('spec');
+    });
+
+    it('한쪽만 spec이 null이면 spec 변경으로 잡는다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      const a = { ...v1, spec: null };
+      const b = { ...v1, versionNo: 2 };
+      repository.findVersion.mockResolvedValueOnce(a).mockResolvedValueOnce(b);
+
+      const result = await service.compareVersions('1', '1', '2');
+
+      expect(result.changes).toContainEqual({
+        field: 'spec',
+        old: null,
+        new: { color: '블랙', size: 'L' },
+      });
     });
   });
 });
