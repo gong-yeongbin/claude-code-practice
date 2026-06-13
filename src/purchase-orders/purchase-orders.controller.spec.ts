@@ -9,6 +9,7 @@ import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-versio
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
+import { SubmitPurchaseOrderDto } from './dto/submit-purchase-order.dto';
 import { ChangeRequestStatus, OrderStatus } from '@generated/prisma/client';
 
 describe('PurchaseOrdersController', () => {
@@ -16,6 +17,7 @@ describe('PurchaseOrdersController', () => {
   let service: {
     create: jest.Mock;
     find: jest.Mock;
+    submit: jest.Mock;
     requestChange: jest.Mock;
     findApprovalHistories: jest.Mock;
     findVersion: jest.Mock;
@@ -56,6 +58,7 @@ describe('PurchaseOrdersController', () => {
     service = {
       create: jest.fn(),
       find: jest.fn(),
+      submit: jest.fn(),
       requestChange: jest.fn(),
       findApprovalHistories: jest.fn(),
       findVersion: jest.fn(),
@@ -111,6 +114,26 @@ describe('PurchaseOrdersController', () => {
       service.find.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
       await expect(controller.find(999)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('submit', () => {
+    const dto: SubmitPurchaseOrderDto = { requesterId: 10 };
+    const submitted: PurchaseOrderResponseDto = { ...mockResponse, status: OrderStatus.PENDING };
+
+    it('id와 dto를 service.submit에 전달하고 결과를 반환한다', async () => {
+      service.submit.mockResolvedValue(submitted);
+
+      const result = await controller.submit(1, dto);
+
+      expect(service.submit).toHaveBeenCalledWith(1, dto);
+      expect(result).toBe(submitted);
+    });
+
+    it('service가 던진 예외를 그대로 전파한다', async () => {
+      service.submit.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
+
+      await expect(controller.submit(999, dto)).rejects.toThrow(NotFoundException);
     });
   });
 

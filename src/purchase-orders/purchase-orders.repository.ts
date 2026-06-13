@@ -4,6 +4,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import {
   ChangeRequest,
   ChangeRequestStatus,
+  OrderStatus,
   Prisma,
   PurchaseOrderVersion,
 } from '@generated/prisma/client';
@@ -75,6 +76,31 @@ export class PurchaseOrdersRepository {
 
     // currentVersion 포인터가 가리키는 버전이 없으면 데이터 정합성이 깨진 상태.
     // 단언으로 모호하게 크래시하는 대신 명시적으로 실패시켜 로그에 남긴다.
+    if (!version) {
+      throw new Error(
+        `Data integrity error: PurchaseOrder ${id} has no version ${order.currentVersion}`,
+      );
+    }
+
+    return { ...order, currentVersionData: version };
+  }
+
+  // 발주서 워크플로우 상태를 변경하고, 현재 버전 스냅샷을 합쳐 반환한다
+  async updateStatus(id: number, status: OrderStatus): Promise<PurchaseOrderWithVersion> {
+    const order = await this.prisma.purchaseOrder.update({
+      where: { id },
+      data: { status },
+    });
+
+    const version = await this.prisma.purchaseOrderVersion.findUnique({
+      where: {
+        purchaseOrderId_versionNo: {
+          purchaseOrderId: order.id,
+          versionNo: order.currentVersion,
+        },
+      },
+    });
+
     if (!version) {
       throw new Error(
         `Data integrity error: PurchaseOrder ${id} has no version ${order.currentVersion}`,

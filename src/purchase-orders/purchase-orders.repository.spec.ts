@@ -4,7 +4,7 @@ import { ConflictException } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PurchaseOrdersRepository, CreatePurchaseOrderInput } from './purchase-orders.repository';
-import { ChangeRequestStatus, UserRole } from '@generated/prisma/client';
+import { ChangeRequestStatus, OrderStatus, UserRole } from '@generated/prisma/client';
 
 describe('PurchaseOrdersRepository', () => {
   let repository: PurchaseOrdersRepository;
@@ -98,6 +98,24 @@ describe('PurchaseOrdersRepository', () => {
       const found = await repository.findById(999999);
 
       expect(found).toBeNull();
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('발주서 상태를 변경하고 현재 버전 스냅샷을 합쳐 반환한다', async () => {
+      const created = await repository.create(baseInput());
+
+      const updated = await repository.updateStatus(created.id, OrderStatus.PENDING);
+
+      expect(updated.id).toBe(created.id);
+      expect(updated.status).toBe(OrderStatus.PENDING);
+      expect(updated.currentVersion).toBe(1);
+      expect(updated.currentVersionData.versionNo).toBe(1);
+      expect(updated.currentVersionData.productName).toBe('코튼 티셔츠');
+
+      // DB에도 반영된다
+      const found = await repository.findById(created.id);
+      expect(found!.status).toBe(OrderStatus.PENDING);
     });
   });
 

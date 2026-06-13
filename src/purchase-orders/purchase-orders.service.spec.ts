@@ -31,6 +31,7 @@ describe('PurchaseOrdersService', () => {
   let repository: {
     create: jest.Mock<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>;
     findById: jest.Mock<Promise<PurchaseOrderWithVersion | null>, [number]>;
+    updateStatus: jest.Mock<Promise<PurchaseOrderWithVersion>, [number, OrderStatus]>;
     createChangeRequest: jest.Mock<Promise<ChangeRequest>, [CreateChangeRequestInput]>;
     existsPendingChangeRequest: jest.Mock<Promise<boolean>, [number]>;
     findApprovalHistories: jest.Mock<Promise<ChangeRequest[]>, [number]>;
@@ -80,6 +81,7 @@ describe('PurchaseOrdersService', () => {
     repository = {
       create: jest.fn<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>(),
       findById: jest.fn<Promise<PurchaseOrderWithVersion | null>, [number]>(),
+      updateStatus: jest.fn<Promise<PurchaseOrderWithVersion>, [number, OrderStatus]>(),
       createChangeRequest: jest.fn<Promise<ChangeRequest>, [CreateChangeRequestInput]>(),
       existsPendingChangeRequest: jest.fn<Promise<boolean>, [number]>(),
       findApprovalHistories: jest.fn<Promise<ChangeRequest[]>, [number]>(),
@@ -178,6 +180,52 @@ describe('PurchaseOrdersService', () => {
 
       await expect(service.find(999)).rejects.toThrow(NotFoundException);
       await expect(service.find(999)).rejects.toThrow('PurchaseOrder 999 not found');
+    });
+  });
+
+  describe('submit', () => {
+    const dto = { requesterId: 10 };
+
+    it('주문자 본인이 DRAFT 발주서를 제출하면 PENDING으로 변경하고 ResponseDto를 반환한다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.updateStatus.mockResolvedValue({ ...mockEntity, status: OrderStatus.PENDING });
+
+      const result = await service.submit(1, dto);
+
+      expect(repository.findById).toHaveBeenCalledWith(1);
+      expect(repository.updateStatus).toHaveBeenCalledWith(1, OrderStatus.PENDING);
+      expect(result).toBeInstanceOf(PurchaseOrderResponseDto);
+      expect(result.id).toBe(1);
+      expect(result.status).toBe(OrderStatus.PENDING);
+    });
+
+    it('발주서가 존재하지 않으면 NotFoundException을 던지고 상태를 변경하지 않는다', async () => {
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.submit(999, dto)).rejects.toThrow(NotFoundException);
+      await expect(service.submit(999, dto)).rejects.toThrow('PurchaseOrder 999 not found');
+      expect(repository.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('요청자가 주문자(buyer)가 아니면 ForbiddenException을 던지고 상태를 변경하지 않는다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+
+      await expect(service.submit(1, { requesterId: 999 })).rejects.toThrow(ForbiddenException);
+      expect(repository.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('발주서 상태가 DRAFT가 아니면(PENDING) ConflictException을 던지고 상태를 변경하지 않는다', async () => {
+      repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.PENDING });
+
+      await expect(service.submit(1, dto)).rejects.toThrow(ConflictException);
+      expect(repository.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('발주서 상태가 CONFIRMED여도 DRAFT가 아니므로 ConflictException을 던진다', async () => {
+      repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.CONFIRMED });
+
+      await expect(service.submit(1, dto)).rejects.toThrow(ConflictException);
+      expect(repository.updateStatus).not.toHaveBeenCalled();
     });
   });
 

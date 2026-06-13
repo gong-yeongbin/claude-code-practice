@@ -18,6 +18,14 @@ Content-Type: application/json
   }
 }
 
+### 발주서 제출 (DRAFT→PENDING). 경로 id는 생성 응답의 data.id, requesterId는 buyerId와 같아야 한다
+PATCH {{host}}/purchase-orders/1/submit
+Content-Type: application/json
+
+{
+  "requesterId": 1
+}
+
 ### 발주서 변경 요청 생성 (경로 id·requesterId를 실제 id로 바꾼다)
 # changes 키는 snake_case(product_name/quantity/unit_price/delivery_date/spec)이며 각 값의 new가 적용된다.
 POST {{host}}/purchase-orders/1/change-requests

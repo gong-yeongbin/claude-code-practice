@@ -1,11 +1,12 @@
 // 발주서 생성 HTTP 엔드포인트. 비즈니스 로직 없이 PurchaseOrdersService에 위임
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
+import { SubmitPurchaseOrderDto } from './dto/submit-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 import { ApiErrorResponse, ApiWrappedResponse } from '@/common/decorators/api-response.decorator';
@@ -30,6 +31,24 @@ export class PurchaseOrdersController {
   @ApiErrorResponse(404, '발주서를 찾을 수 없음')
   async find(@Param('id', ParseIntPipe) id: number): Promise<PurchaseOrderResponseDto> {
     return this.purchaseOrdersService.find(id);
+  }
+
+  @Patch(':id/submit')
+  @ApiOperation({
+    summary: '발주서 제출(DRAFT→PENDING)',
+    description: '주문자(buyer) 본인만, 발주서가 DRAFT 상태일 때 제출 가능.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: '발주서 ID' })
+  @ApiWrappedResponse(PurchaseOrderResponseDto, { description: '제출된 발주서' })
+  @ApiErrorResponse(400, '요청 본문 검증 실패')
+  @ApiErrorResponse(403, '주문자(buyer) 본인이 아님')
+  @ApiErrorResponse(404, '발주서를 찾을 수 없음')
+  @ApiErrorResponse(409, '발주서가 DRAFT 상태가 아님')
+  async submit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SubmitPurchaseOrderDto,
+  ): Promise<PurchaseOrderResponseDto> {
+    return this.purchaseOrdersService.submit(id, dto);
   }
 
   @Get(':id/approval-histories')

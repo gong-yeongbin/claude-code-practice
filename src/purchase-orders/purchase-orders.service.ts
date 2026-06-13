@@ -11,6 +11,7 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
+import { SubmitPurchaseOrderDto } from './dto/submit-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 import { OrderStatus, Prisma } from '@generated/prisma/client';
@@ -46,6 +47,28 @@ export class PurchaseOrdersService {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
     return PurchaseOrderResponseDto.fromEntity(order);
+  }
+
+  // 발주서를 제출해 DRAFT→PENDING으로 전환한다. 발주서가 없으면 NotFoundException,
+  // 주문자(buyer) 본인이 아니면 ForbiddenException, DRAFT 상태가 아니면 ConflictException.
+  async submit(id: number, dto: SubmitPurchaseOrderDto): Promise<PurchaseOrderResponseDto> {
+    const order = await this.purchaseOrdersRepository.findById(id);
+    if (!order) {
+      throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+
+    if (dto.requesterId !== order.buyerId) {
+      throw new ForbiddenException(`Only the buyer can submit PurchaseOrder ${id}`);
+    }
+
+    if (order.status !== OrderStatus.DRAFT) {
+      throw new ConflictException(
+        `PurchaseOrder ${id} is ${order.status}; only DRAFT orders can be submitted`,
+      );
+    }
+
+    const updated = await this.purchaseOrdersRepository.updateStatus(id, OrderStatus.PENDING);
+    return PurchaseOrderResponseDto.fromEntity(updated);
   }
 
   async findApprovalHistories(id: number): Promise<ChangeRequestResponseDto[]> {
