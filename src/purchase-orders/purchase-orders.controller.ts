@@ -3,6 +3,7 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
+import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 
@@ -31,5 +32,13 @@ export class PurchaseOrdersController {
     @Body() dto: CreateChangeRequestDto,
   ): Promise<ChangeRequestResponseDto> {
     return this.purchaseOrdersService.requestChange(id, dto);
+  }
+
+  @Get(':id/versions/:versionNo')
+  async findVersion(
+    @Param('id') id: string,
+    @Param('versionNo') versionNo: string,
+  ): Promise<PurchaseOrderVersionResponseDto> {
+    return this.purchaseOrdersService.findVersion(id, versionNo);
   }
 }

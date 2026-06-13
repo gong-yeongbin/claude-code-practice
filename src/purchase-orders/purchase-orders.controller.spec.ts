@@ -4,6 +4,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
+import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
@@ -16,6 +17,7 @@ describe('PurchaseOrdersController', () => {
     find: jest.Mock;
     requestChange: jest.Mock;
     findApprovalHistories: jest.Mock;
+    findVersion: jest.Mock;
   };
 
   const mockResponse: PurchaseOrderResponseDto = {
@@ -53,6 +55,7 @@ describe('PurchaseOrdersController', () => {
       find: jest.fn(),
       requestChange: jest.fn(),
       findApprovalHistories: jest.fn(),
+      findVersion: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -161,6 +164,46 @@ describe('PurchaseOrdersController', () => {
       service.requestChange.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
       await expect(controller.requestChange('999', dto)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findVersion', () => {
+    const mockVersionResponse: PurchaseOrderVersionResponseDto = {
+      id: 1,
+      purchaseOrderId: 1,
+      versionNo: 1,
+      productName: '코튼 티셔츠',
+      quantity: 1000,
+      unitPrice: '5500.00',
+      deliveryDate: new Date('2026-03-15T00:00:00Z'),
+      spec: { color: '블랙', size: 'L' },
+      changeRequestId: null,
+      validFrom: new Date('2026-01-01T00:00:00Z'),
+      validTo: null,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    };
+
+    it('id와 versionNo를 service.findVersion에 전달하고 결과를 반환한다', async () => {
+      service.findVersion.mockResolvedValue(mockVersionResponse);
+
+      const result = await controller.findVersion('1', '1');
+
+      expect(service.findVersion).toHaveBeenCalledWith('1', '1');
+      expect(result).toBe(mockVersionResponse);
+    });
+
+    it('발주서가 없으면 service가 던진 NotFoundException을 그대로 전파한다', async () => {
+      service.findVersion.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
+
+      await expect(controller.findVersion('999', '1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('버전이 없으면 service가 던진 NotFoundException을 그대로 전파한다', async () => {
+      service.findVersion.mockRejectedValue(
+        new NotFoundException('PurchaseOrder 1 version 99 not found'),
+      );
+
+      await expect(controller.findVersion('1', '99')).rejects.toThrow(NotFoundException);
     });
   });
 });

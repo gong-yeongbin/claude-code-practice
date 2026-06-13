@@ -3,6 +3,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersRepository } from './purchase-orders.repository';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
+import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { Prisma } from '../../generated/prisma/client';
@@ -56,6 +57,18 @@ export class PurchaseOrdersService {
       changes: dto.changes as Prisma.InputJsonValue,
     });
     return ChangeRequestResponseDto.fromEntity(changeRequest);
+  }
+
+  async findVersion(id: string, versionNo: string): Promise<PurchaseOrderVersionResponseDto> {
+    const order = await this.purchaseOrdersRepository.findById(Number(id));
+    if (!order) {
+      throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+    const version = await this.purchaseOrdersRepository.findVersion(Number(id), Number(versionNo));
+    if (!version) {
+      throw new NotFoundException(`PurchaseOrder ${id} version ${versionNo} not found`);
+    }
+    return PurchaseOrderVersionResponseDto.fromEntity(version);
   }
 
   // 발주 번호 채번. PO-yyyyMMddHHmmss-랜덤4자리로 사람이 읽기 쉬운 번호 생성

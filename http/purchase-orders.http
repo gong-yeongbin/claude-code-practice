@@ -39,6 +39,10 @@ Content-Type: application/json
 GET {{host}}/purchase-orders/{{purchaseOrderId}}
 Accept: application/json
 
+### 발주서 특정 버전 조회 (purchaseOrderId와 versionNo로 스냅샷 조회)
+GET {{host}}/purchase-orders/{{purchaseOrderId}}/versions/1
+Accept: application/json
+
 ### 발주서 승인 이력 조회 (승인된 변경 요청을 시간순으로 반환)
 GET {{host}}/purchase-orders/{{purchaseOrderId}}/approval-histories
 Accept: application/json

@@ -15,8 +15,10 @@ import {
   ChangeRequestStatus,
   OrderStatus,
   Prisma,
+  PurchaseOrderVersion,
 } from '../../generated/prisma/client';
 import { CreateChangeRequestInput } from './purchase-orders.repository';
+import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 
 describe('PurchaseOrdersService', () => {
   let service: PurchaseOrdersService;
@@ -25,6 +27,7 @@ describe('PurchaseOrdersService', () => {
     findById: jest.Mock<Promise<PurchaseOrderWithVersion | null>, [number]>;
     createChangeRequest: jest.Mock<Promise<ChangeRequest>, [CreateChangeRequestInput]>;
     findApprovalHistories: jest.Mock<Promise<ChangeRequest[]>, [number]>;
+    findVersion: jest.Mock<Promise<PurchaseOrderVersion | null>, [number, number]>;
   };
 
   const mockEntity: PurchaseOrderWithVersion = {
@@ -71,6 +74,7 @@ describe('PurchaseOrdersService', () => {
       findById: jest.fn<Promise<PurchaseOrderWithVersion | null>, [number]>(),
       createChangeRequest: jest.fn<Promise<ChangeRequest>, [CreateChangeRequestInput]>(),
       findApprovalHistories: jest.fn<Promise<ChangeRequest[]>, [number]>(),
+      findVersion: jest.fn<Promise<PurchaseOrderVersion | null>, [number, number]>(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -254,6 +258,62 @@ describe('PurchaseOrdersService', () => {
         'PurchaseOrder 999 not found',
       );
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findVersion', () => {
+    const mockVersion: PurchaseOrderVersion = {
+      id: 1,
+      purchaseOrderId: 1,
+      versionNo: 1,
+      productName: '코튼 티셔츠',
+      quantity: 1000,
+      unitPrice: new Prisma.Decimal('5500.00'),
+      deliveryDate: new Date('2026-03-15T00:00:00Z'),
+      spec: { color: '블랙', size: 'L' },
+      changeRequestId: null,
+      validFrom: new Date('2026-01-01T00:00:00Z'),
+      validTo: null,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    };
+
+    it('존재하는 발주서와 버전이면 VersionResponseDto를 반환한다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.findVersion.mockResolvedValue(mockVersion);
+
+      const result = await service.findVersion('1', '1');
+
+      expect(repository.findById).toHaveBeenCalledWith(1);
+      expect(repository.findVersion).toHaveBeenCalledWith(1, 1);
+      expect(result).toBeInstanceOf(PurchaseOrderVersionResponseDto);
+      expect(result.id).toBe(1);
+      expect(result.versionNo).toBe(1);
+      expect(result.productName).toBe('코튼 티셔츠');
+      expect(result.quantity).toBe(1000);
+      expect(result.unitPrice).toBe('5500');
+      expect(result.spec).toEqual({ color: '블랙', size: 'L' });
+      expect(result.changeRequestId).toBeNull();
+      expect(result.validTo).toBeNull();
+    });
+
+    it('발주서가 존재하지 않으면 NotFoundException을 던지고 버전을 조회하지 않는다', async () => {
+      repository.findById.mockResolvedValue(null);
+
+      await expect(service.findVersion('999', '1')).rejects.toThrow(NotFoundException);
+      await expect(service.findVersion('999', '1')).rejects.toThrow(
+        'PurchaseOrder 999 not found',
+      );
+      expect(repository.findVersion).not.toHaveBeenCalled();
+    });
+
+    it('버전이 존재하지 않으면 NotFoundException을 던진다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.findVersion.mockResolvedValue(null);
+
+      await expect(service.findVersion('1', '99')).rejects.toThrow(NotFoundException);
+      await expect(service.findVersion('1', '99')).rejects.toThrow(
+        'PurchaseOrder 1 version 99 not found',
+      );
     });
   });
 });

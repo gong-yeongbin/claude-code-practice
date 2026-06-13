@@ -189,4 +189,29 @@ describe('PurchaseOrdersRepository', () => {
       expect(cr.reviewerId).toBeNull();
     });
   });
+
+  describe('findVersion', () => {
+    it('존재하는 버전을 반환한다', async () => {
+      const created = await repository.create(baseInput());
+
+      const version = await repository.findVersion(created.id, 1);
+
+      expect(version).not.toBeNull();
+      expect(version!.purchaseOrderId).toBe(created.id);
+      expect(version!.versionNo).toBe(1);
+      expect(version!.productName).toBe('코튼 티셔츠');
+      expect(version!.quantity).toBe(1000);
+      expect(version!.unitPrice.toString()).toBe('5500');
+      expect(version!.spec).toEqual({ color: '블랙', size: 'L' });
+      expect(version!.validTo).toBeNull();
+    });
+
+    it('존재하지 않는 versionNo이면 null을 반환한다', async () => {
+      const created = await repository.create(baseInput());
+
+      const version = await repository.findVersion(created.id, 999);
+
+      expect(version).toBeNull();
+    });
+  });
 });
