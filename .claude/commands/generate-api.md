@@ -158,4 +158,4 @@ pnpm test -- src/$ARGUMENTS --coverage
 - 응답 본문 참조 시 `data` 래핑을 고려한다 (목록은 `data[0].id`, 단건은 `data.id`).
 - 생성 요청 본문에는 DTO 도메인 필드를 채운다. 파악이 어려우면 `// TODO` 주석으로 남긴다.
 
-모든 작업이 완료되면 `generate-commit-message` 스킬을 호출해 커밋 메시지를 생성한다.
+모든 작업이 완료되면 `pnpm run format`을 실행해 코드를 포맷팅한 뒤, `generate-commit-message` 스킬을 호출해 커밋 메시지를 생성한다.
