@@ -190,6 +190,50 @@ describe('PurchaseOrdersRepository', () => {
     });
   });
 
+  describe('existsPendingChangeRequest', () => {
+    it('PENDING 변경 요청이 있으면 true를 반환한다', async () => {
+      const po = await repository.create(baseInput());
+      await prisma.changeRequest.create({
+        data: {
+          purchaseOrderId: po.id,
+          requesterId: buyerId,
+          reason: '대기 중',
+          changes: { quantity: { old: 1000, new: 1500 } },
+          status: ChangeRequestStatus.PENDING,
+        },
+      });
+
+      const result = await repository.existsPendingChangeRequest(po.id);
+
+      expect(result).toBe(true);
+    });
+
+    it('PENDING 변경 요청이 없으면(APPROVED만 있으면) false를 반환한다', async () => {
+      const po = await repository.create(baseInput());
+      await prisma.changeRequest.create({
+        data: {
+          purchaseOrderId: po.id,
+          requesterId: buyerId,
+          reason: '승인됨',
+          changes: { quantity: { old: 1000, new: 1500 } },
+          status: ChangeRequestStatus.APPROVED,
+        },
+      });
+
+      const result = await repository.existsPendingChangeRequest(po.id);
+
+      expect(result).toBe(false);
+    });
+
+    it('변경 요청이 전혀 없으면 false를 반환한다', async () => {
+      const po = await repository.create(baseInput());
+
+      const result = await repository.existsPendingChangeRequest(po.id);
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe('findVersion', () => {
     it('존재하는 버전을 반환한다', async () => {
       const created = await repository.create(baseInput());

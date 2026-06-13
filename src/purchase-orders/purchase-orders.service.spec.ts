@@ -27,6 +27,7 @@ describe('PurchaseOrdersService', () => {
     create: jest.Mock<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>;
     findById: jest.Mock<Promise<PurchaseOrderWithVersion | null>, [number]>;
     createChangeRequest: jest.Mock<Promise<ChangeRequest>, [CreateChangeRequestInput]>;
+    existsPendingChangeRequest: jest.Mock<Promise<boolean>, [number]>;
     findApprovalHistories: jest.Mock<Promise<ChangeRequest[]>, [number]>;
     findVersion: jest.Mock<Promise<PurchaseOrderVersion | null>, [number, number]>;
     findVersionAt: jest.Mock<Promise<PurchaseOrderVersion | null>, [number, Date]>;
@@ -75,6 +76,7 @@ describe('PurchaseOrdersService', () => {
       create: jest.fn<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>(),
       findById: jest.fn<Promise<PurchaseOrderWithVersion | null>, [number]>(),
       createChangeRequest: jest.fn<Promise<ChangeRequest>, [CreateChangeRequestInput]>(),
+      existsPendingChangeRequest: jest.fn<Promise<boolean>, [number]>(),
       findApprovalHistories: jest.fn<Promise<ChangeRequest[]>, [number]>(),
       findVersion: jest.fn<Promise<PurchaseOrderVersion | null>, [number, number]>(),
       findVersionAt: jest.fn<Promise<PurchaseOrderVersion | null>, [number, Date]>(),
@@ -238,6 +240,7 @@ describe('PurchaseOrdersService', () => {
 
     it('주문자 본인이 CONFIRMED 이상 발주서에 변경 요청하면 생성하고 ResponseDto를 반환한다', async () => {
       repository.findById.mockResolvedValue(confirmedEntity);
+      repository.existsPendingChangeRequest.mockResolvedValue(false);
       repository.createChangeRequest.mockResolvedValue(mockChangeRequest);
 
       const result = await service.requestChange('1', dto);
@@ -293,11 +296,24 @@ describe('PurchaseOrdersService', () => {
 
     it('발주서 상태가 IN_PRODUCTION이면 변경 요청을 생성한다', async () => {
       repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.IN_PRODUCTION });
+      repository.existsPendingChangeRequest.mockResolvedValue(false);
       repository.createChangeRequest.mockResolvedValue(mockChangeRequest);
 
       await service.requestChange('1', dto);
 
       expect(repository.createChangeRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('동일 발주서에 PENDING 변경 요청이 있으면 ConflictException을 던지고 생성하지 않는다', async () => {
+      repository.findById.mockResolvedValue(confirmedEntity);
+      repository.existsPendingChangeRequest.mockResolvedValue(true);
+
+      await expect(service.requestChange('1', dto)).rejects.toThrow(ConflictException);
+      await expect(service.requestChange('1', dto)).rejects.toThrow(
+        'PurchaseOrder 1 already has a pending change request',
+      );
+      expect(repository.existsPendingChangeRequest).toHaveBeenCalledWith(1);
+      expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
   });
 

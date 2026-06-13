@@ -83,6 +83,15 @@ export class PurchaseOrdersRepository {
     });
   }
 
+  // 동일 발주서에 처리 대기(PENDING) 중인 변경 요청이 있는지 확인한다
+  async existsPendingChangeRequest(purchaseOrderId: number): Promise<boolean> {
+    const pending = await this.prisma.changeRequest.findFirst({
+      where: { purchaseOrderId, status: ChangeRequestStatus.PENDING },
+      select: { id: true },
+    });
+    return pending !== null;
+  }
+
   async createChangeRequest(input: CreateChangeRequestInput): Promise<ChangeRequest> {
     return this.prisma.changeRequest.create({
       data: {

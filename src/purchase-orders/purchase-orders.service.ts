@@ -74,6 +74,11 @@ export class PurchaseOrdersService {
       );
     }
 
+    // 동일 발주서에 처리 대기 중인 변경 요청이 있으면 신규 생성 불가
+    if (await this.purchaseOrdersRepository.existsPendingChangeRequest(purchaseOrderId)) {
+      throw new ConflictException(`PurchaseOrder ${id} already has a pending change request`);
+    }
+
     const changeRequest = await this.purchaseOrdersRepository.createChangeRequest({
       purchaseOrderId,
       requesterId: dto.requesterId,
