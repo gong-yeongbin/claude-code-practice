@@ -25,26 +25,14 @@
 
 따라서 응답 본문에서 값을 꺼낼 때는 항상 `data` 아래로 들어간다. 단건 응답은 `data.id`, 목록 응답은 `data[0].id`처럼 참조한다. 204(예: DELETE)는 인터셉터가 감싸지 않고 빈 body를 반환한다.
 
-## 이전 응답의 값 재사용
+## id 값 다루기
 
-직전 요청의 응답 값을 다음 요청에 쓸 때는 **직접 참조 방식(`{{요청명.response.body...}}`)을 쓰지 않는다.** IDE가 요청을 보내기 전 변수를 치환하려다 응답이 없으면 "unsubstituted variable" 에러로 요청 자체를 막기 때문이다.
-
-대신 **응답 핸들러 스크립트로 전역 변수에 저장**한 뒤 일반 변수처럼 참조한다.
-
-```http
-### 유저 전체 조회 (첫 번째 id를 전역 변수에 저장)
-GET {{host}}/users
-
-> {%
-    client.global.set("firstUserId", response.body.data[0].id);
-%}
-
-### 유저 단건 조회 (저장된 변수 사용)
-GET {{host}}/users/{{firstUserId}}
-```
-
-`{{firstUserId}}`는 일반 변수라 값이 없어도 요청을 막지 않는다. 저장하는 요청을 먼저 한 번 실행한 뒤 사용하는 요청을 실행한다.
+응답을 자동 캡처하는 전역 변수(`> {% client.global.set(...) %}`)는 쓰지 않는다. 경로 파라미터와 요청 본문의 id(예: `/users/1`, `"buyerId": 1`)는 **placeholder 리터럴**이다. 생성·조회 요청을 먼저 보낸 뒤, 그 응답의 `data.id`를 직접 복사해 다음 요청의 id 자리에 바꿔 넣고 실행한다.
 
 ## 실행 순서
 
-요청 간 의존성이 있으면 순서대로 실행한다. 예를 들어 전역 변수에 id를 저장하는 조회를 먼저 실행해야 그 변수를 쓰는 단건 조회·삭제가 동작한다.
+요청 간 의존성이 있으면 순서대로 실행하고, 앞 응답에서 받은 id를 뒤 요청에 채워 넣는다. 파일 간 의존 순서는 다음과 같다.
+
+1. `users.http` — BUYER와 SOURCING을 만들고 각 응답의 id를 메모해 둔다.
+2. `purchase-orders.http` — BUYER의 id를 `buyerId`에 넣어 발주서를 만들고, 그 발주서 id로 변경 요청을 만든다.
+3. `change-requests.http` — 변경요청 id를 경로에, SOURCING의 id를 `reviewerId`에 넣어 검토(승인/반려)한다. 승인 후 `purchase-orders.http`의 버전/diff 조회로 결과를 확인한다.

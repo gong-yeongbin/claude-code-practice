@@ -1,107 +1,37 @@
-# ChangeRequests 승인/반려 엔드포인트를 IntelliJ HTTP Client로 테스트하는 요청 모음
+# ChangeRequests 리소스 엔드포인트를 IntelliJ HTTP Client로 테스트하는 요청 모음
 # 실행 전 우상단에서 환경(local)을 선택한다. host 값은 http-client.env.json 참조.
-
-### 주문자(BUYER) 생성 (buyerId 전역 변수에 저장)
-# 발주서·변경요청 생성에 필요하므로 먼저 주문자를 만든다.
-POST {{host}}/users
-Content-Type: application/json
-
-{
-  "name": "주문자",
-  "role": "BUYER"
-}
-
-> {%
-    client.global.set("buyerId", response.body.data.id);
-%}
-
-### 소싱팀(SOURCING) 생성 (reviewerId 전역 변수에 저장)
-# 변경요청을 검토(승인/반려)하는 담당자를 만든다.
-POST {{host}}/users
-Content-Type: application/json
-
-{
-  "name": "소싱담당",
-  "role": "SOURCING"
-}
-
-> {%
-    client.global.set("reviewerId", response.body.data.id);
-%}
-
-### 발주서 생성 (저장된 buyerId 사용, 생성된 id를 purchaseOrderId 전역 변수에 저장)
-POST {{host}}/purchase-orders
-Content-Type: application/json
-
-{
-  "buyerId": {{buyerId}},
-  "productName": "코튼 티셔츠",
-  "quantity": 1000,
-  "unitPrice": "5500.00",
-  "deliveryDate": "2026-03-15"
-}
-
-> {%
-    client.global.set("purchaseOrderId", response.body.data.id);
-%}
-
-### 발주서 변경 요청 생성 (생성된 변경요청 id를 changeRequestId 전역 변수에 저장)
-# changes 키는 snake_case(product_name/quantity/unit_price/delivery_date/spec)이며 각 값의 new가 적용된다.
-POST {{host}}/purchase-orders/{{purchaseOrderId}}/change-requests
-Content-Type: application/json
-
-{
-  "requesterId": {{buyerId}},
-  "reason": "수량을 늘리고 납기를 미뤄야 합니다",
-  "changes": {
-    "quantity": {
-      "old": 1000,
-      "new": 1500
-    },
-    "delivery_date": {
-      "old": "2026-03-15",
-      "new": "2026-03-25"
-    }
-  }
-}
-
-> {%
-    client.global.set("changeRequestId", response.body.data.id);
-%}
+# 경로의 id(예: /change-requests/1)·reviewerId는 placeholder다. 실제 응답에서 받은 id로 바꿔 실행한다.
 
 ### 변경 요청 승인 (승인 시 changes를 적용한 새 버전을 만들고 발주서에 반영, 검토 의견은 선택)
-PATCH {{host}}/change-requests/{{changeRequestId}}
+# reviewerId는 users.http에서 만든 SOURCING의 실제 id로 바꾼다.
+PATCH {{host}}/change-requests/1
 Content-Type: application/json
 
 {
   "status": "APPROVED",
-  "reviewerId": {{reviewerId}},
+  "reviewerId": 1,
   "reviewComment": "검토 결과 승인합니다"
 }
 
 ### 소싱팀이 아닌 검토자의 승인 시도 (403 Forbidden — 승인/반려는 소싱팀만 가능)
-# reviewerId에 주문자(BUYER)를 넣으면 권한이 없어 거부된다.
-PATCH {{host}}/change-requests/{{changeRequestId}}
+# reviewerId에 주문자(BUYER)의 id를 넣으면 권한이 없어 거부된다.
+PATCH {{host}}/change-requests/1
 Content-Type: application/json
 
 {
   "status": "APPROVED",
-  "reviewerId": {{buyerId}},
+  "reviewerId": 2,
   "reviewComment": "권한 없는 사용자의 승인 시도"
 }
-
-### 승인 결과 확인 (발주서를 재조회해 currentVersion 증가와 변경 내용 반영을 확인)
-GET {{host}}/purchase-orders/{{purchaseOrderId}}
-Accept: application/json
 
 ### 변경 요청 반려 (반려 시 reviewComment 필수)
 # 위 승인을 이미 실행했다면 같은 변경요청은 PENDING이 아니므로 409(Conflict)가 난다.
 # 반려 흐름을 보려면 새 변경요청을 만들어 그 id로 실행한다.
-PATCH {{host}}/change-requests/{{changeRequestId}}
+PATCH {{host}}/change-requests/1
 Content-Type: application/json
 
 {
   "status": "REJECTED",
-  "reviewerId": {{reviewerId}},
+  "reviewerId": 1,
   "reviewComment": "현재 단가로는 수량 증가가 어렵습니다"
 }

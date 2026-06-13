@@ -1,0 +1,6 @@
+# 앱 루트(헬스 체크) 엔드포인트를 IntelliJ HTTP Client로 테스트하는 요청 모음
+# 실행 전 우상단에서 환경(local)을 선택한다. host 값은 http-client.env.json 참조.
+
+### Hello World (앱 헬스 체크)
+GET {{host}}/
+Accept: text/plain

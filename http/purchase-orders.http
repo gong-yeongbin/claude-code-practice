@@ -1,26 +1,13 @@
-# PurchaseOrders 생성 엔드포인트를 IntelliJ HTTP Client로 테스트하는 요청 모음
+# PurchaseOrders 리소스 엔드포인트를 IntelliJ HTTP Client로 테스트하는 요청 모음
 # 실행 전 우상단에서 환경(local)을 선택한다. host 값은 http-client.env.json 참조.
+# buyerId·경로의 id(예: /purchase-orders/1)는 placeholder다. 실제 응답에서 받은 id로 바꿔 실행한다.
 
-### 주문자(BUYER) 생성 (buyerId 전역 변수에 저장)
-# 발주서 생성에는 buyerId가 필요하므로 먼저 주문자를 만든다.
-POST {{host}}/users
-Content-Type: application/json
-
-{
-  "name": "주문자",
-  "role": "BUYER"
-}
-
-> {%
-    client.global.set("buyerId", response.body.data.id);
-%}
-
-### 발주서 생성 (저장된 buyerId 사용, 생성된 id를 purchaseOrderId 전역 변수에 저장)
+### 발주서 생성 (buyerId는 users.http에서 만든 BUYER의 실제 id로 바꾼다)
 POST {{host}}/purchase-orders
 Content-Type: application/json
 
 {
-  "buyerId": {{buyerId}},
+  "buyerId": 1,
   "productName": "코튼 티셔츠",
   "quantity": 1000,
   "unitPrice": "5500.00",
@@ -31,41 +18,43 @@ Content-Type: application/json
   }
 }
 
-> {%
-    client.global.set("purchaseOrderId", response.body.data.id);
-%}
-
-### 발주서 단건 조회 (저장된 purchaseOrderId 사용)
-GET {{host}}/purchase-orders/{{purchaseOrderId}}
-Accept: application/json
-
-### 발주서 특정 버전 조회 (purchaseOrderId와 versionNo로 스냅샷 조회)
-GET {{host}}/purchase-orders/{{purchaseOrderId}}/versions/1
-Accept: application/json
-
-### 발주서 승인 이력 조회 (승인된 변경 요청을 시간순으로 반환)
-GET {{host}}/purchase-orders/{{purchaseOrderId}}/approval-histories
-Accept: application/json
-
-### 발주서 변경 요청 (주문자가 저장된 purchaseOrderId/buyerId로 변경 요청 생성)
-POST {{host}}/purchase-orders/{{purchaseOrderId}}/change-requests
+### 발주서 변경 요청 생성 (경로 id·requesterId를 실제 id로 바꾼다)
+# changes 키는 snake_case(product_name/quantity/unit_price/delivery_date/spec)이며 각 값의 new가 적용된다.
+POST {{host}}/purchase-orders/1/change-requests
 Content-Type: application/json
 
 {
-  "requesterId": {{buyerId}},
-  "reason": "수량을 늘려야 합니다",
+  "requesterId": 1,
+  "reason": "수량을 늘리고 납기를 미뤄야 합니다",
   "changes": {
     "quantity": {
       "old": 1000,
       "new": 1500
+    },
+    "delivery_date": {
+      "old": "2026-03-15",
+      "new": "2026-03-25"
     }
   }
 }
 
+### 발주서 단건 조회
+GET {{host}}/purchase-orders/1
+Accept: application/json
+
+### 발주서 특정 버전 조회 (purchaseOrderId와 versionNo로 스냅샷 조회)
+GET {{host}}/purchase-orders/1/versions/1
+Accept: application/json
+
+### 발주서 승인 이력 조회 (승인된 변경 요청을 시간순으로 반환)
+GET {{host}}/purchase-orders/1/approval-histories
+Accept: application/json
+
 ### 발주서 시점 스냅샷 조회 (at 시각에 유효했던 버전 반환)
-GET {{host}}/purchase-orders/{{purchaseOrderId}}/snapshot?at=2026-01-15T00:00:00Z
+GET {{host}}/purchase-orders/1/snapshot?at=2026-01-15T00:00:00Z
 Accept: application/json
 
 ### 발주서 두 버전 비교 (from·to 버전 사이에 바뀐 필드만 반환)
-GET {{host}}/purchase-orders/{{purchaseOrderId}}/diff?from=1&to=2
+# to=2는 변경 요청이 승인돼 버전 2가 생긴 뒤에만 동작한다.
+GET {{host}}/purchase-orders/1/diff?from=1&to=2
 Accept: application/json
