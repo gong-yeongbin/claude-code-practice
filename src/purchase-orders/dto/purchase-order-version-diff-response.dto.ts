@@ -1,6 +1,7 @@
 // 두 버전 비교 결과. 엔티티가 아니라 두 PurchaseOrderVersion 스냅샷을 비교해 계산한 응답
 import { ApiProperty } from '@nestjs/swagger';
 import { PurchaseOrderVersion } from '@generated/prisma/client';
+import { toDateOnlyString } from '@/common/utils/date-format';
 
 // 변경된 필드 하나의 이전/이후 값
 export interface VersionFieldChange {
@@ -55,7 +56,11 @@ export class PurchaseOrderVersionDiffResponseDto {
       dto.changes.push({ field: 'unitPrice', old: fromPrice, new: toPrice });
     }
     if (from.deliveryDate.getTime() !== to.deliveryDate.getTime()) {
-      dto.changes.push({ field: 'deliveryDate', old: from.deliveryDate, new: to.deliveryDate });
+      dto.changes.push({
+        field: 'deliveryDate',
+        old: toDateOnlyString(from.deliveryDate),
+        new: toDateOnlyString(to.deliveryDate),
+      });
     }
     // spec은 JSON이라 직렬화해 비교. null/undefined는 null로 정규화
     const fromSpec = from.spec ?? null;

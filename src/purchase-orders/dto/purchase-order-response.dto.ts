@@ -1,6 +1,7 @@
 // 발주서 생성 응답. PurchaseOrder 메타와 생성된 v1 버전의 도메인 필드를 합쳐 노출
 import { ApiProperty } from '@nestjs/swagger';
 import { PurchaseOrder, PurchaseOrderVersion, OrderStatus } from '@generated/prisma/client';
+import { toDateOnlyString } from '@/common/utils/date-format';
 
 // Repository.create가 반환하는, 발주서와 현재 버전을 합친 구조
 export type PurchaseOrderWithVersion = PurchaseOrder & {
@@ -28,8 +29,8 @@ export class PurchaseOrderResponseDto {
   quantity: number;
   @ApiProperty({ description: '단가(문자열, Decimal 정밀도 보존)', example: '5500.00' })
   unitPrice: string;
-  @ApiProperty({ description: '납기일', example: '2026-03-15' })
-  deliveryDate: Date;
+  @ApiProperty({ description: '납기일(날짜-only, YYYY-MM-DD)', example: '2026-03-15' })
+  deliveryDate: string;
   @ApiProperty({
     type: 'object',
     additionalProperties: true,
@@ -38,9 +39,9 @@ export class PurchaseOrderResponseDto {
     example: { color: '블랙', size: 'L' },
   })
   spec: Record<string, unknown> | null;
-  @ApiProperty({ description: '생성 시각', example: '2026-06-13T00:00:00.000Z' })
+  @ApiProperty({ description: '생성 시각(KST)', example: '2026-06-13T09:00:00.000+09:00' })
   createdAt: Date;
-  @ApiProperty({ description: '수정 시각', example: '2026-06-13T00:00:00.000Z' })
+  @ApiProperty({ description: '수정 시각(KST)', example: '2026-06-13T09:00:00.000+09:00' })
   updatedAt: Date;
 
   static fromEntity(entity: PurchaseOrderWithVersion): PurchaseOrderResponseDto {
@@ -54,7 +55,7 @@ export class PurchaseOrderResponseDto {
     dto.productName = version.productName;
     dto.quantity = version.quantity;
     dto.unitPrice = version.unitPrice.toString();
-    dto.deliveryDate = version.deliveryDate;
+    dto.deliveryDate = toDateOnlyString(version.deliveryDate);
     dto.spec = version.spec as Record<string, unknown> | null;
     dto.createdAt = entity.createdAt;
     dto.updatedAt = entity.updatedAt;

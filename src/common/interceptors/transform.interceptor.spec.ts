@@ -45,6 +45,20 @@ describe('TransformInterceptor', () => {
     expect(typeof result.timestamp).toBe('string');
   });
 
+  it('data에 포함된 Date를 KST(+09:00) 문자열로 변환한다', async () => {
+    reflector.getAllAndOverride.mockReturnValue(undefined);
+
+    const result = (await lastValueFrom(
+      interceptor.intercept(
+        createContext(200),
+        createNext({ createdAt: new Date('2026-06-13T00:00:00.000Z') }),
+      ),
+    )) as ApiResponse<{ createdAt: string }>;
+
+    expect(result.data?.createdAt).toBe('2026-06-13T09:00:00.000+09:00');
+    expect(result.timestamp).toMatch(/\+09:00$/);
+  });
+
   it('@ResponseMessage 메타데이터가 있으면 그 메시지를 사용한다', async () => {
     reflector.getAllAndOverride.mockReturnValue('생성 완료');
 

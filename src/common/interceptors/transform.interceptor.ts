@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { Observable, map } from 'rxjs';
 import { ApiResponse } from '@/common/dto/api-response.dto';
 import { RESPONSE_MESSAGE } from '@/common/decorators/response-message.decorator';
+import { deepConvertDatesToKst, toKstIsoString } from '@/common/utils/date-format';
 
 @Injectable()
 export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T> | T> {
@@ -30,8 +31,9 @@ export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T
           success: true,
           statusCode,
           message: customMessage ?? 'OK',
-          data,
-          timestamp: new Date().toISOString(),
+          // 응답 data에 포함된 모든 타임스탬프(Date)를 KST(+09:00)로 변환한다
+          data: deepConvertDatesToKst(data) as T,
+          timestamp: toKstIsoString(new Date()),
           path: req.url,
         };
       }),

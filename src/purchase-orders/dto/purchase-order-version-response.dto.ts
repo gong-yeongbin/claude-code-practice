@@ -1,6 +1,7 @@
 // 발주서 특정 버전 조회 응답. PurchaseOrderVersion 스냅샷 필드를 노출
 import { ApiProperty } from '@nestjs/swagger';
 import { PurchaseOrderVersion } from '@generated/prisma/client';
+import { toDateOnlyString } from '@/common/utils/date-format';
 
 export class PurchaseOrderVersionResponseDto {
   @ApiProperty({ description: '버전 레코드 ID', example: 100 })
@@ -15,8 +16,8 @@ export class PurchaseOrderVersionResponseDto {
   quantity: number;
   @ApiProperty({ description: '단가(문자열, Decimal 정밀도 보존)', example: '5500.00' })
   unitPrice: string;
-  @ApiProperty({ description: '납기일', example: '2026-03-15' })
-  deliveryDate: Date;
+  @ApiProperty({ description: '납기일(날짜-only, YYYY-MM-DD)', example: '2026-03-15' })
+  deliveryDate: string;
   @ApiProperty({
     type: 'object',
     additionalProperties: true,
@@ -50,7 +51,7 @@ export class PurchaseOrderVersionResponseDto {
     dto.productName = entity.productName;
     dto.quantity = entity.quantity;
     dto.unitPrice = entity.unitPrice.toString();
-    dto.deliveryDate = entity.deliveryDate;
+    dto.deliveryDate = toDateOnlyString(entity.deliveryDate);
     dto.spec = entity.spec as Record<string, unknown> | null;
     dto.changeRequestId = entity.changeRequestId;
     dto.validFrom = entity.validFrom;
