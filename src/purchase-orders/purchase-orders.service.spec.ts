@@ -394,11 +394,15 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findVersionAt.mockResolvedValue(mockVersion);
 
-      const at = '2026-01-15T00:00:00Z';
+      const at = '2026-01-15';
       const result = await service.findSnapshot(1, at);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
-      expect(repository.findVersionAt).toHaveBeenCalledWith(1, new Date(at));
+      // 날짜는 KST '그 날 시작'(00:00+09:00) 시각으로 환산되어 전달된다
+      expect(repository.findVersionAt).toHaveBeenCalledWith(
+        1,
+        new Date('2026-01-15T00:00:00.000+09:00'),
+      );
       expect(result).toBeInstanceOf(PurchaseOrderVersionResponseDto);
       expect(result.versionNo).toBe(1);
       expect(result.productName).toBe('코튼 티셔츠');
@@ -409,10 +413,8 @@ describe('PurchaseOrdersService', () => {
     it('발주서가 존재하지 않으면 NotFoundException을 던지고 버전을 조회하지 않는다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.findSnapshot(999, '2026-01-15T00:00:00Z')).rejects.toThrow(
-        NotFoundException,
-      );
-      await expect(service.findSnapshot(999, '2026-01-15T00:00:00Z')).rejects.toThrow(
+      await expect(service.findSnapshot(999, '2026-01-15')).rejects.toThrow(NotFoundException);
+      await expect(service.findSnapshot(999, '2026-01-15')).rejects.toThrow(
         'PurchaseOrder 999 not found',
       );
       expect(repository.findVersionAt).not.toHaveBeenCalled();
@@ -422,7 +424,7 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findVersionAt.mockResolvedValue(null);
 
-      const at = '2025-01-01T00:00:00Z';
+      const at = '2025-01-01';
       await expect(service.findSnapshot(1, at)).rejects.toThrow(NotFoundException);
       await expect(service.findSnapshot(1, at)).rejects.toThrow(
         `PurchaseOrder 1 has no version at ${at}`,

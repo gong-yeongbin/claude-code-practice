@@ -93,9 +93,14 @@ export class PurchaseOrdersController {
   @Get(':id/snapshot')
   @ApiOperation({ summary: '특정 시점에 유효했던 버전 스냅샷 조회' })
   @ApiParam({ name: 'id', type: Number, description: '발주서 ID' })
-  @ApiQuery({ name: 'at', type: String, description: '조회 시점(ISO 8601 날짜·시각)' })
+  @ApiQuery({
+    name: 'at',
+    type: String,
+    description: '조회 날짜(YYYY-MM-DD). 해당 날짜의 KST 자정 기준으로 유효했던 버전을 찾는다',
+    example: '2026-02-15',
+  })
   @ApiWrappedResponse(PurchaseOrderVersionResponseDto, { description: '해당 시점의 버전 스냅샷' })
-  @ApiErrorResponse(400, 'at이 유효한 날짜 형식이 아님')
+  @ApiErrorResponse(400, 'at이 YYYY-MM-DD 형식이 아님')
   @ApiErrorResponse(404, '발주서 또는 해당 시점 버전을 찾을 수 없음')
   async findSnapshot(
     @Param('id', ParseIntPipe) id: number,

@@ -1,5 +1,10 @@
 // KST 날짜 포맷 유틸 검증
-import { deepConvertDatesToKst, toDateOnlyString, toKstIsoString } from './date-format';
+import {
+  deepConvertDatesToKst,
+  kstStartOfDay,
+  toDateOnlyString,
+  toKstIsoString,
+} from './date-format';
 
 describe('date-format', () => {
   describe('toKstIsoString', () => {
@@ -19,6 +24,23 @@ describe('date-format', () => {
   describe('toDateOnlyString', () => {
     it('타임존 변환 없이 YYYY-MM-DD 부분만 취한다', () => {
       expect(toDateOnlyString(new Date('2026-03-15T00:00:00.000Z'))).toBe('2026-03-15');
+    });
+  });
+
+  describe('kstStartOfDay', () => {
+    it('YYYY-MM-DD를 KST 그 날 시작(00:00+09:00 = 전날 15:00 UTC) 시각으로 변환한다', () => {
+      expect(kstStartOfDay('2026-02-15')).toEqual(new Date('2026-02-14T15:00:00.000Z'));
+    });
+
+    it('형식이 YYYY-MM-DD가 아니면 null을 반환한다', () => {
+      expect(kstStartOfDay('2026-02-15T00:00:00Z')).toBeNull();
+      expect(kstStartOfDay('날짜아님')).toBeNull();
+      expect(kstStartOfDay('2026-2-5')).toBeNull();
+    });
+
+    it('존재하지 않는 날짜(롤오버)는 null을 반환한다', () => {
+      expect(kstStartOfDay('2026-02-31')).toBeNull();
+      expect(kstStartOfDay('2026-13-01')).toBeNull();
     });
   });
 

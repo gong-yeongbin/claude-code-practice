@@ -14,6 +14,7 @@ import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 import { OrderStatus, Prisma } from '@generated/prisma/client';
+import { kstStartOfDay } from '@/common/utils/date-format';
 
 // CONFIRMED 이상(CONFIRMED→IN_PRODUCTION→COMPLETED)부터 변경 요청이 가능하다
 const CHANGE_REQUESTABLE_STATUSES: OrderStatus[] = [
@@ -106,9 +107,10 @@ export class PurchaseOrdersService {
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
-    const atDate = new Date(at);
-    if (Number.isNaN(atDate.getTime())) {
-      throw new BadRequestException(`Invalid date format: ${at}`);
+    // 조회 시점은 날짜(YYYY-MM-DD)만 받아 KST 기준 '그 날 시작' 시각으로 환산한다.
+    const atDate = kstStartOfDay(at);
+    if (atDate === null) {
+      throw new BadRequestException(`Invalid date format (expected YYYY-MM-DD): ${at}`);
     }
     const version = await this.purchaseOrdersRepository.findVersionAt(id, atDate);
     if (!version) {
