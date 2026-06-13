@@ -38,27 +38,27 @@ export class PurchaseOrdersService {
     return PurchaseOrderResponseDto.fromEntity(order);
   }
 
-  async find(id: string): Promise<PurchaseOrderResponseDto> {
-    const order = await this.purchaseOrdersRepository.findById(Number(id));
+  async find(id: number): Promise<PurchaseOrderResponseDto> {
+    const order = await this.purchaseOrdersRepository.findById(id);
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
     return PurchaseOrderResponseDto.fromEntity(order);
   }
 
-  async findApprovalHistories(id: string): Promise<ChangeRequestResponseDto[]> {
-    const order = await this.purchaseOrdersRepository.findById(Number(id));
+  async findApprovalHistories(id: number): Promise<ChangeRequestResponseDto[]> {
+    const order = await this.purchaseOrdersRepository.findById(id);
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
-    const histories = await this.purchaseOrdersRepository.findApprovalHistories(Number(id));
+    const histories = await this.purchaseOrdersRepository.findApprovalHistories(id);
     return histories.map((h) => ChangeRequestResponseDto.fromEntity(h));
   }
 
   // 주문자가 특정 발주서에 대한 변경 요청을 생성. 발주서가 없으면 NotFoundException.
   // 주문자(buyer) 본인만 요청 가능하며, 발주서 상태가 CONFIRMED 이상일 때만 허용한다.
-  async requestChange(id: string, dto: CreateChangeRequestDto): Promise<ChangeRequestResponseDto> {
-    const purchaseOrderId = Number(id);
+  async requestChange(id: number, dto: CreateChangeRequestDto): Promise<ChangeRequestResponseDto> {
+    const purchaseOrderId = id;
     const order = await this.purchaseOrdersRepository.findById(purchaseOrderId);
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
@@ -88,24 +88,24 @@ export class PurchaseOrdersService {
     return ChangeRequestResponseDto.fromEntity(changeRequest);
   }
 
-  async findVersion(id: string, versionNo: string): Promise<PurchaseOrderVersionResponseDto> {
-    const order = await this.purchaseOrdersRepository.findById(Number(id));
+  async findVersion(id: number, versionNo: number): Promise<PurchaseOrderVersionResponseDto> {
+    const order = await this.purchaseOrdersRepository.findById(id);
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
-    const version = await this.purchaseOrdersRepository.findVersion(Number(id), Number(versionNo));
+    const version = await this.purchaseOrdersRepository.findVersion(id, versionNo);
     if (!version) {
       throw new NotFoundException(`PurchaseOrder ${id} version ${versionNo} not found`);
     }
     return PurchaseOrderVersionResponseDto.fromEntity(version);
   }
 
-  async findSnapshot(id: string, at: string): Promise<PurchaseOrderVersionResponseDto> {
-    const order = await this.purchaseOrdersRepository.findById(Number(id));
+  async findSnapshot(id: number, at: string): Promise<PurchaseOrderVersionResponseDto> {
+    const order = await this.purchaseOrdersRepository.findById(id);
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
-    const version = await this.purchaseOrdersRepository.findVersionAt(Number(id), new Date(at));
+    const version = await this.purchaseOrdersRepository.findVersionAt(id, new Date(at));
     if (!version) {
       throw new NotFoundException(`PurchaseOrder ${id} has no version at ${at}`);
     }
@@ -114,11 +114,11 @@ export class PurchaseOrdersService {
 
   // 두 버전을 비교해 어떤 필드가 어떻게 바뀌었는지 반환. 발주서/버전 없으면 NotFoundException
   async compareVersions(
-    id: string,
+    id: number,
     from: string,
     to: string,
   ): Promise<PurchaseOrderVersionDiffResponseDto> {
-    const purchaseOrderId = Number(id);
+    const purchaseOrderId = id;
     const order = await this.purchaseOrdersRepository.findById(purchaseOrderId);
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);

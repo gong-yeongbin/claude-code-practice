@@ -75,16 +75,16 @@ describe('UsersController', () => {
     it('id를 service.find에 전달하고 결과를 반환한다', async () => {
       service.find.mockResolvedValue(mockResponse);
 
-      const result = await controller.find('1');
+      const result = await controller.find(1);
 
-      expect(service.find).toHaveBeenCalledWith('1');
+      expect(service.find).toHaveBeenCalledWith(1);
       expect(result).toBe(mockResponse);
     });
 
     it('service가 던진 예외를 그대로 전파한다', async () => {
       service.find.mockRejectedValue(new NotFoundException('User 999 not found'));
 
-      await expect(controller.find('999')).rejects.toThrow(NotFoundException);
+      await expect(controller.find(999)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -92,16 +92,16 @@ describe('UsersController', () => {
     it('id를 service.delete에 전달한다', async () => {
       service.delete.mockResolvedValue(undefined);
 
-      const result = await controller.delete('1');
+      const result = await controller.delete(1);
 
-      expect(service.delete).toHaveBeenCalledWith('1');
+      expect(service.delete).toHaveBeenCalledWith(1);
       expect(result).toBeUndefined();
     });
 
     it('service가 던진 예외를 그대로 전파한다', async () => {
       service.delete.mockRejectedValue(new NotFoundException('User 999 not found'));
 
-      await expect(controller.delete('999')).rejects.toThrow(NotFoundException);
+      await expect(controller.delete(999)).rejects.toThrow(NotFoundException);
     });
   });
 });

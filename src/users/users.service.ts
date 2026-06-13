@@ -15,8 +15,8 @@ export class UsersService {
     return UserResponseDto.fromEntity(user);
   }
 
-  async find(id: string): Promise<UserResponseDto> {
-    const user = await this.usersRepository.findById(Number(id));
+  async find(id: number): Promise<UserResponseDto> {
+    const user = await this.usersRepository.findById(id);
     if (!user) {
       throw new NotFoundException(`User ${id} not found`);
     }
@@ -28,8 +28,8 @@ export class UsersService {
     return users.map((user) => UserResponseDto.fromEntity(user));
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: number): Promise<void> {
     await this.find(id);
-    await this.usersRepository.delete(Number(id));
+    await this.usersRepository.delete(id);
   }
 }

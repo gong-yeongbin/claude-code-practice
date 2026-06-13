@@ -153,10 +153,10 @@ describe('PurchaseOrdersService', () => {
   });
 
   describe('find', () => {
-    it('존재하는 id면 number로 변환해 조회하고 ResponseDto를 반환한다', async () => {
+    it('존재하는 id로 조회하고 ResponseDto를 반환한다', async () => {
       repository.findById.mockResolvedValue(mockEntity);
 
-      const result = await service.find('1');
+      const result = await service.find(1);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
       expect(result).toBeInstanceOf(PurchaseOrderResponseDto);
@@ -171,8 +171,8 @@ describe('PurchaseOrdersService', () => {
     it('존재하지 않으면 NotFoundException을 던진다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.find('999')).rejects.toThrow(NotFoundException);
-      await expect(service.find('999')).rejects.toThrow('PurchaseOrder 999 not found');
+      await expect(service.find(999)).rejects.toThrow(NotFoundException);
+      await expect(service.find(999)).rejects.toThrow('PurchaseOrder 999 not found');
     });
   });
 
@@ -195,7 +195,7 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findApprovalHistories.mockResolvedValue([mockApprovedCr]);
 
-      const result = await service.findApprovalHistories('1');
+      const result = await service.findApprovalHistories(1);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
       expect(repository.findApprovalHistories).toHaveBeenCalledWith(1);
@@ -209,7 +209,7 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findApprovalHistories.mockResolvedValue([]);
 
-      const result = await service.findApprovalHistories('1');
+      const result = await service.findApprovalHistories(1);
 
       expect(result).toEqual([]);
     });
@@ -217,8 +217,8 @@ describe('PurchaseOrdersService', () => {
     it('발주서가 존재하지 않으면 NotFoundException을 던지고 이력을 조회하지 않는다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.findApprovalHistories('999')).rejects.toThrow(NotFoundException);
-      await expect(service.findApprovalHistories('999')).rejects.toThrow(
+      await expect(service.findApprovalHistories(999)).rejects.toThrow(NotFoundException);
+      await expect(service.findApprovalHistories(999)).rejects.toThrow(
         'PurchaseOrder 999 not found',
       );
       expect(repository.findApprovalHistories).not.toHaveBeenCalled();
@@ -243,7 +243,7 @@ describe('PurchaseOrdersService', () => {
       repository.existsPendingChangeRequest.mockResolvedValue(false);
       repository.createChangeRequest.mockResolvedValue(mockChangeRequest);
 
-      const result = await service.requestChange('1', dto);
+      const result = await service.requestChange(1, dto);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
       expect(repository.createChangeRequest).toHaveBeenCalledTimes(1);
@@ -265,10 +265,8 @@ describe('PurchaseOrdersService', () => {
     it('발주서가 존재하지 않으면 NotFoundException을 던지고 변경 요청을 생성하지 않는다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.requestChange('999', dto)).rejects.toThrow(NotFoundException);
-      await expect(service.requestChange('999', dto)).rejects.toThrow(
-        'PurchaseOrder 999 not found',
-      );
+      await expect(service.requestChange(999, dto)).rejects.toThrow(NotFoundException);
+      await expect(service.requestChange(999, dto)).rejects.toThrow('PurchaseOrder 999 not found');
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
 
@@ -276,21 +274,21 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(confirmedEntity);
 
       const otherRequester = { ...dto, requesterId: 999 };
-      await expect(service.requestChange('1', otherRequester)).rejects.toThrow(ForbiddenException);
+      await expect(service.requestChange(1, otherRequester)).rejects.toThrow(ForbiddenException);
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
 
     it('발주서 상태가 CONFIRMED 미만(DRAFT)이면 ConflictException을 던지고 생성하지 않는다', async () => {
       repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.DRAFT });
 
-      await expect(service.requestChange('1', dto)).rejects.toThrow(ConflictException);
+      await expect(service.requestChange(1, dto)).rejects.toThrow(ConflictException);
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
 
     it('발주서 상태가 PENDING이면 ConflictException을 던지고 생성하지 않는다', async () => {
       repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.PENDING });
 
-      await expect(service.requestChange('1', dto)).rejects.toThrow(ConflictException);
+      await expect(service.requestChange(1, dto)).rejects.toThrow(ConflictException);
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
 
@@ -299,7 +297,7 @@ describe('PurchaseOrdersService', () => {
       repository.existsPendingChangeRequest.mockResolvedValue(false);
       repository.createChangeRequest.mockResolvedValue(mockChangeRequest);
 
-      await service.requestChange('1', dto);
+      await service.requestChange(1, dto);
 
       expect(repository.createChangeRequest).toHaveBeenCalledTimes(1);
     });
@@ -308,8 +306,8 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(confirmedEntity);
       repository.existsPendingChangeRequest.mockResolvedValue(true);
 
-      await expect(service.requestChange('1', dto)).rejects.toThrow(ConflictException);
-      await expect(service.requestChange('1', dto)).rejects.toThrow(
+      await expect(service.requestChange(1, dto)).rejects.toThrow(ConflictException);
+      await expect(service.requestChange(1, dto)).rejects.toThrow(
         'PurchaseOrder 1 already has a pending change request',
       );
       expect(repository.existsPendingChangeRequest).toHaveBeenCalledWith(1);
@@ -337,7 +335,7 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findVersion.mockResolvedValue(mockVersion);
 
-      const result = await service.findVersion('1', '1');
+      const result = await service.findVersion(1, 1);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
       expect(repository.findVersion).toHaveBeenCalledWith(1, 1);
@@ -355,8 +353,8 @@ describe('PurchaseOrdersService', () => {
     it('발주서가 존재하지 않으면 NotFoundException을 던지고 버전을 조회하지 않는다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.findVersion('999', '1')).rejects.toThrow(NotFoundException);
-      await expect(service.findVersion('999', '1')).rejects.toThrow('PurchaseOrder 999 not found');
+      await expect(service.findVersion(999, 1)).rejects.toThrow(NotFoundException);
+      await expect(service.findVersion(999, 1)).rejects.toThrow('PurchaseOrder 999 not found');
       expect(repository.findVersion).not.toHaveBeenCalled();
     });
 
@@ -364,8 +362,8 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findVersion.mockResolvedValue(null);
 
-      await expect(service.findVersion('1', '99')).rejects.toThrow(NotFoundException);
-      await expect(service.findVersion('1', '99')).rejects.toThrow(
+      await expect(service.findVersion(1, 99)).rejects.toThrow(NotFoundException);
+      await expect(service.findVersion(1, 99)).rejects.toThrow(
         'PurchaseOrder 1 version 99 not found',
       );
     });
@@ -392,7 +390,7 @@ describe('PurchaseOrdersService', () => {
       repository.findVersionAt.mockResolvedValue(mockVersion);
 
       const at = '2026-01-15T00:00:00Z';
-      const result = await service.findSnapshot('1', at);
+      const result = await service.findSnapshot(1, at);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
       expect(repository.findVersionAt).toHaveBeenCalledWith(1, new Date(at));
@@ -406,10 +404,10 @@ describe('PurchaseOrdersService', () => {
     it('발주서가 존재하지 않으면 NotFoundException을 던지고 버전을 조회하지 않는다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.findSnapshot('999', '2026-01-15T00:00:00Z')).rejects.toThrow(
+      await expect(service.findSnapshot(999, '2026-01-15T00:00:00Z')).rejects.toThrow(
         NotFoundException,
       );
-      await expect(service.findSnapshot('999', '2026-01-15T00:00:00Z')).rejects.toThrow(
+      await expect(service.findSnapshot(999, '2026-01-15T00:00:00Z')).rejects.toThrow(
         'PurchaseOrder 999 not found',
       );
       expect(repository.findVersionAt).not.toHaveBeenCalled();
@@ -420,8 +418,8 @@ describe('PurchaseOrdersService', () => {
       repository.findVersionAt.mockResolvedValue(null);
 
       const at = '2025-01-01T00:00:00Z';
-      await expect(service.findSnapshot('1', at)).rejects.toThrow(NotFoundException);
-      await expect(service.findSnapshot('1', at)).rejects.toThrow(
+      await expect(service.findSnapshot(1, at)).rejects.toThrow(NotFoundException);
+      await expect(service.findSnapshot(1, at)).rejects.toThrow(
         `PurchaseOrder 1 has no version at ${at}`,
       );
     });
@@ -460,8 +458,8 @@ describe('PurchaseOrdersService', () => {
     it('발주서가 없으면 NotFoundException을 던지고 버전을 조회하지 않는다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.compareVersions('999', '1', '2')).rejects.toThrow(NotFoundException);
-      await expect(service.compareVersions('999', '1', '2')).rejects.toThrow(
+      await expect(service.compareVersions(999, '1', '2')).rejects.toThrow(NotFoundException);
+      await expect(service.compareVersions(999, '1', '2')).rejects.toThrow(
         'PurchaseOrder 999 not found',
       );
       expect(repository.findVersion).not.toHaveBeenCalled();
@@ -471,8 +469,8 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findVersion.mockResolvedValue(null);
 
-      await expect(service.compareVersions('1', '99', '2')).rejects.toThrow(NotFoundException);
-      await expect(service.compareVersions('1', '99', '2')).rejects.toThrow(
+      await expect(service.compareVersions(1, '99', '2')).rejects.toThrow(NotFoundException);
+      await expect(service.compareVersions(1, '99', '2')).rejects.toThrow(
         'PurchaseOrder 1 version 99 not found',
       );
     });
@@ -484,8 +482,8 @@ describe('PurchaseOrdersService', () => {
         Promise.resolve(versionNo === 1 ? v1 : null),
       );
 
-      await expect(service.compareVersions('1', '1', '99')).rejects.toThrow(NotFoundException);
-      await expect(service.compareVersions('1', '1', '99')).rejects.toThrow(
+      await expect(service.compareVersions(1, '1', '99')).rejects.toThrow(NotFoundException);
+      await expect(service.compareVersions(1, '1', '99')).rejects.toThrow(
         'PurchaseOrder 1 version 99 not found',
       );
     });
@@ -494,7 +492,7 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findVersion.mockResolvedValueOnce(v1).mockResolvedValueOnce(v2);
 
-      const result = await service.compareVersions('1', '1', '2');
+      const result = await service.compareVersions(1, '1', '2');
 
       expect(repository.findById).toHaveBeenCalledWith(1);
       expect(repository.findVersion).toHaveBeenNthCalledWith(1, 1, 1);
@@ -524,7 +522,7 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.findVersion.mockResolvedValueOnce(v1).mockResolvedValueOnce({ ...v1 });
 
-      const result = await service.compareVersions('1', '1', '1');
+      const result = await service.compareVersions(1, '1', '1');
 
       expect(result.changes).toEqual([]);
     });
@@ -535,7 +533,7 @@ describe('PurchaseOrdersService', () => {
       const b = { ...v1, versionNo: 2, spec: null };
       repository.findVersion.mockResolvedValueOnce(a).mockResolvedValueOnce(b);
 
-      const result = await service.compareVersions('1', '1', '2');
+      const result = await service.compareVersions(1, '1', '2');
 
       expect(result.changes.map((c) => c.field)).not.toContain('spec');
     });
@@ -546,7 +544,7 @@ describe('PurchaseOrdersService', () => {
       const b = { ...v1, versionNo: 2 };
       repository.findVersion.mockResolvedValueOnce(a).mockResolvedValueOnce(b);
 
-      const result = await service.compareVersions('1', '1', '2');
+      const result = await service.compareVersions(1, '1', '2');
 
       expect(result.changes).toContainEqual({
         field: 'spec',

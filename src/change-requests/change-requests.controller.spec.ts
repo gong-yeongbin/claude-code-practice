@@ -49,9 +49,9 @@ describe('ChangeRequestsController', () => {
       };
       service.review.mockResolvedValue(mockResponse);
 
-      const result = await controller.review('1', dto);
+      const result = await controller.review(1, dto);
 
-      expect(service.review).toHaveBeenCalledWith('1', dto);
+      expect(service.review).toHaveBeenCalledWith(1, dto);
       expect(result).toBe(mockResponse);
     });
 
@@ -63,7 +63,7 @@ describe('ChangeRequestsController', () => {
       };
       service.review.mockRejectedValue(new NotFoundException('ChangeRequest 999 not found'));
 
-      await expect(controller.review('999', dto)).rejects.toThrow(NotFoundException);
+      await expect(controller.review(999, dto)).rejects.toThrow(NotFoundException);
     });
 
     it('소싱팀이 아니어서 service가 던진 ForbiddenException을 그대로 전파한다', async () => {
@@ -75,7 +75,7 @@ describe('ChangeRequestsController', () => {
         new ForbiddenException('User 2 is not authorized to review change requests'),
       );
 
-      await expect(controller.review('1', dto)).rejects.toThrow(ForbiddenException);
+      await expect(controller.review(1, dto)).rejects.toThrow(ForbiddenException);
     });
 
     it('이미 처리되어 service가 던진 ConflictException을 그대로 전파한다', async () => {
@@ -87,7 +87,7 @@ describe('ChangeRequestsController', () => {
         new ConflictException('ChangeRequest 1 is already APPROVED'),
       );
 
-      await expect(controller.review('1', dto)).rejects.toThrow(ConflictException);
+      await expect(controller.review(1, dto)).rejects.toThrow(ConflictException);
     });
   });
 });

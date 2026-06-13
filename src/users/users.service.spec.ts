@@ -58,10 +58,10 @@ describe('UsersService', () => {
   });
 
   describe('find', () => {
-    it('존재하는 id면 number로 변환해 조회하고 ResponseDto를 반환한다', async () => {
+    it('존재하는 id로 조회하고 ResponseDto를 반환한다', async () => {
       repository.findById.mockResolvedValue(mockEntity);
 
-      const result = await service.find('1');
+      const result = await service.find(1);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
       expect(result).toBeInstanceOf(UserResponseDto);
@@ -71,8 +71,8 @@ describe('UsersService', () => {
     it('존재하지 않으면 NotFoundException을 던진다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.find('999')).rejects.toThrow(NotFoundException);
-      await expect(service.find('999')).rejects.toThrow('User 999 not found');
+      await expect(service.find(999)).rejects.toThrow(NotFoundException);
+      await expect(service.find(999)).rejects.toThrow('User 999 not found');
     });
   });
 
@@ -103,7 +103,7 @@ describe('UsersService', () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.delete.mockResolvedValue(mockEntity);
 
-      const result = await service.delete('1');
+      const result = await service.delete(1);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
       expect(repository.delete).toHaveBeenCalledWith(1);
@@ -113,7 +113,7 @@ describe('UsersService', () => {
     it('존재하지 않으면 NotFoundException을 던지고 repository.delete를 호출하지 않는다', async () => {
       repository.findById.mockResolvedValue(null);
 
-      await expect(service.delete('999')).rejects.toThrow(NotFoundException);
+      await expect(service.delete(999)).rejects.toThrow(NotFoundException);
       expect(repository.delete).not.toHaveBeenCalled();
     });
   });

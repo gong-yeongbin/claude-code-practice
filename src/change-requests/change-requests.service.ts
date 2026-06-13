@@ -23,10 +23,10 @@ export class ChangeRequestsService {
 
   // 변경 요청을 승인/반려하고 검토자·의견·검토시각을 기록한다.
   // 대상이 없으면 NotFoundException, 이미 처리된(PENDING이 아닌) 요청이면 ConflictException
-  async review(id: string, dto: ReviewChangeRequestDto): Promise<ChangeRequestResponseDto> {
+  async review(id: number, dto: ReviewChangeRequestDto): Promise<ChangeRequestResponseDto> {
     await this.assertReviewerIsSourcing(dto.reviewerId);
 
-    const changeRequestId = Number(id);
+    const changeRequestId = id;
     const changeRequest = await this.changeRequestsRepository.findById(changeRequestId);
     if (!changeRequest) {
       throw new NotFoundException(`ChangeRequest ${id} not found`);

@@ -107,7 +107,7 @@ describe('ChangeRequestsService', () => {
         reviewerId: 3,
         reviewComment: '승인합니다',
       };
-      const result = await service.review('1', dto);
+      const result = await service.review(1, dto);
 
       expect(repository.findCurrentVersion).toHaveBeenCalledWith(10);
       expect(repository.applyApproval).toHaveBeenCalledWith({
@@ -147,7 +147,7 @@ describe('ChangeRequestsService', () => {
         status: ChangeRequestStatus.APPROVED,
         reviewerId: 3,
       };
-      await service.review('1', dto);
+      await service.review(1, dto);
 
       expect(repository.applyApproval).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -171,7 +171,7 @@ describe('ChangeRequestsService', () => {
         status: ChangeRequestStatus.APPROVED,
         reviewerId: 3,
       };
-      await service.review('1', dto);
+      await service.review(1, dto);
 
       expect(repository.applyApproval).toHaveBeenCalledWith(
         expect.objectContaining({ reviewComment: null }),
@@ -190,7 +190,7 @@ describe('ChangeRequestsService', () => {
         status: ChangeRequestStatus.APPROVED,
         reviewerId: 3,
       };
-      await service.review('1', dto);
+      await service.review(1, dto);
 
       expect(repository.applyApproval).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -207,7 +207,7 @@ describe('ChangeRequestsService', () => {
         status: ChangeRequestStatus.APPROVED,
         reviewerId: 3,
       };
-      await expect(service.review('1', dto)).rejects.toThrow(NotFoundException);
+      await expect(service.review(1, dto)).rejects.toThrow(NotFoundException);
       expect(repository.applyApproval).not.toHaveBeenCalled();
     });
   });
@@ -228,7 +228,7 @@ describe('ChangeRequestsService', () => {
         reviewerId: 3,
         reviewComment: '근거가 부족합니다',
       };
-      const result = await service.review('1', dto);
+      const result = await service.review(1, dto);
 
       expect(repository.updateReview).toHaveBeenCalledWith(1, {
         status: ChangeRequestStatus.REJECTED,
@@ -255,7 +255,7 @@ describe('ChangeRequestsService', () => {
         status: ChangeRequestStatus.REJECTED,
         reviewerId: 3,
       };
-      await service.review('1', dto);
+      await service.review(1, dto);
 
       expect(repository.updateReview).toHaveBeenCalledWith(
         1,
@@ -276,7 +276,7 @@ describe('ChangeRequestsService', () => {
         status: ChangeRequestStatus.APPROVED,
         reviewerId: 3,
       };
-      await expect(service.review('1', dto)).rejects.toThrow(ForbiddenException);
+      await expect(service.review(1, dto)).rejects.toThrow(ForbiddenException);
       expect(repository.findReviewer).toHaveBeenCalledWith(3);
       expect(repository.findById).not.toHaveBeenCalled();
     });
@@ -289,7 +289,7 @@ describe('ChangeRequestsService', () => {
         reviewerId: 999,
         reviewComment: '권한 없음',
       };
-      await expect(service.review('1', dto)).rejects.toThrow(ForbiddenException);
+      await expect(service.review(1, dto)).rejects.toThrow(ForbiddenException);
       expect(repository.findById).not.toHaveBeenCalled();
     });
   });
@@ -302,8 +302,8 @@ describe('ChangeRequestsService', () => {
         status: ChangeRequestStatus.APPROVED,
         reviewerId: 3,
       };
-      await expect(service.review('999', dto)).rejects.toThrow(NotFoundException);
-      await expect(service.review('999', dto)).rejects.toThrow('ChangeRequest 999 not found');
+      await expect(service.review(999, dto)).rejects.toThrow(NotFoundException);
+      await expect(service.review(999, dto)).rejects.toThrow('ChangeRequest 999 not found');
       expect(repository.findCurrentVersion).not.toHaveBeenCalled();
     });
 
@@ -318,8 +318,8 @@ describe('ChangeRequestsService', () => {
         reviewerId: 3,
         reviewComment: '재검토',
       };
-      await expect(service.review('1', dto)).rejects.toThrow(ConflictException);
-      await expect(service.review('1', dto)).rejects.toThrow('ChangeRequest 1 is already APPROVED');
+      await expect(service.review(1, dto)).rejects.toThrow(ConflictException);
+      await expect(service.review(1, dto)).rejects.toThrow('ChangeRequest 1 is already APPROVED');
     });
   });
 });

@@ -101,16 +101,16 @@ describe('PurchaseOrdersController', () => {
     it('id를 service.find에 전달하고 결과를 반환한다', async () => {
       service.find.mockResolvedValue(mockResponse);
 
-      const result = await controller.find('1');
+      const result = await controller.find(1);
 
-      expect(service.find).toHaveBeenCalledWith('1');
+      expect(service.find).toHaveBeenCalledWith(1);
       expect(result).toBe(mockResponse);
     });
 
     it('service가 던진 예외를 그대로 전파한다', async () => {
       service.find.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
-      await expect(controller.find('999')).rejects.toThrow(NotFoundException);
+      await expect(controller.find(999)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -134,9 +134,9 @@ describe('PurchaseOrdersController', () => {
     it('id를 service.findApprovalHistories에 전달하고 결과를 반환한다', async () => {
       service.findApprovalHistories.mockResolvedValue(mockHistories);
 
-      const result = await controller.findApprovalHistories('1');
+      const result = await controller.findApprovalHistories(1);
 
-      expect(service.findApprovalHistories).toHaveBeenCalledWith('1');
+      expect(service.findApprovalHistories).toHaveBeenCalledWith(1);
       expect(result).toBe(mockHistories);
     });
 
@@ -145,7 +145,7 @@ describe('PurchaseOrdersController', () => {
         new NotFoundException('PurchaseOrder 999 not found'),
       );
 
-      await expect(controller.findApprovalHistories('999')).rejects.toThrow(NotFoundException);
+      await expect(controller.findApprovalHistories(999)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -159,16 +159,16 @@ describe('PurchaseOrdersController', () => {
     it('id와 dto를 service.requestChange에 전달하고 결과를 반환한다', async () => {
       service.requestChange.mockResolvedValue(mockChangeRequest);
 
-      const result = await controller.requestChange('1', dto);
+      const result = await controller.requestChange(1, dto);
 
-      expect(service.requestChange).toHaveBeenCalledWith('1', dto);
+      expect(service.requestChange).toHaveBeenCalledWith(1, dto);
       expect(result).toBe(mockChangeRequest);
     });
 
     it('service가 던진 예외를 그대로 전파한다', async () => {
       service.requestChange.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
-      await expect(controller.requestChange('999', dto)).rejects.toThrow(NotFoundException);
+      await expect(controller.requestChange(999, dto)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -191,16 +191,16 @@ describe('PurchaseOrdersController', () => {
     it('id와 versionNo를 service.findVersion에 전달하고 결과를 반환한다', async () => {
       service.findVersion.mockResolvedValue(mockVersionResponse);
 
-      const result = await controller.findVersion('1', '1');
+      const result = await controller.findVersion(1, 1);
 
-      expect(service.findVersion).toHaveBeenCalledWith('1', '1');
+      expect(service.findVersion).toHaveBeenCalledWith(1, 1);
       expect(result).toBe(mockVersionResponse);
     });
 
     it('발주서가 없으면 service가 던진 NotFoundException을 그대로 전파한다', async () => {
       service.findVersion.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
-      await expect(controller.findVersion('999', '1')).rejects.toThrow(NotFoundException);
+      await expect(controller.findVersion(999, 1)).rejects.toThrow(NotFoundException);
     });
 
     it('버전이 없으면 service가 던진 NotFoundException을 그대로 전파한다', async () => {
@@ -208,7 +208,7 @@ describe('PurchaseOrdersController', () => {
         new NotFoundException('PurchaseOrder 1 version 99 not found'),
       );
 
-      await expect(controller.findVersion('1', '99')).rejects.toThrow(NotFoundException);
+      await expect(controller.findVersion(1, 99)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -231,16 +231,16 @@ describe('PurchaseOrdersController', () => {
     it('id와 at을 service.findSnapshot에 전달하고 결과를 반환한다', async () => {
       service.findSnapshot.mockResolvedValue(mockVersionResponse);
 
-      const result = await controller.findSnapshot('1', '2026-01-15T00:00:00Z');
+      const result = await controller.findSnapshot(1, '2026-01-15T00:00:00Z');
 
-      expect(service.findSnapshot).toHaveBeenCalledWith('1', '2026-01-15T00:00:00Z');
+      expect(service.findSnapshot).toHaveBeenCalledWith(1, '2026-01-15T00:00:00Z');
       expect(result).toBe(mockVersionResponse);
     });
 
     it('발주서가 없으면 service가 던진 NotFoundException을 그대로 전파한다', async () => {
       service.findSnapshot.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
-      await expect(controller.findSnapshot('999', '2026-01-15T00:00:00Z')).rejects.toThrow(
+      await expect(controller.findSnapshot(999, '2026-01-15T00:00:00Z')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -250,7 +250,7 @@ describe('PurchaseOrdersController', () => {
         new NotFoundException('PurchaseOrder 1 has no version at 2025-01-01T00:00:00Z'),
       );
 
-      await expect(controller.findSnapshot('1', '2025-01-01T00:00:00Z')).rejects.toThrow(
+      await expect(controller.findSnapshot(1, '2025-01-01T00:00:00Z')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -267,9 +267,9 @@ describe('PurchaseOrdersController', () => {
     it('id, from, to를 service.compareVersions에 전달하고 결과를 반환한다', async () => {
       service.compareVersions.mockResolvedValue(mockDiffResponse);
 
-      const result = await controller.compareVersions('1', '1', '2');
+      const result = await controller.compareVersions(1, '1', '2');
 
-      expect(service.compareVersions).toHaveBeenCalledWith('1', '1', '2');
+      expect(service.compareVersions).toHaveBeenCalledWith(1, '1', '2');
       expect(result).toBe(mockDiffResponse);
     });
 
@@ -278,7 +278,7 @@ describe('PurchaseOrdersController', () => {
         new NotFoundException('PurchaseOrder 999 not found'),
       );
 
-      await expect(controller.compareVersions('999', '1', '2')).rejects.toThrow(NotFoundException);
+      await expect(controller.compareVersions(999, '1', '2')).rejects.toThrow(NotFoundException);
     });
 
     it('버전이 없으면 service가 던진 NotFoundException을 그대로 전파한다', async () => {
@@ -286,7 +286,7 @@ describe('PurchaseOrdersController', () => {
         new NotFoundException('PurchaseOrder 1 version 99 not found'),
       );
 
-      await expect(controller.compareVersions('1', '1', '99')).rejects.toThrow(NotFoundException);
+      await expect(controller.compareVersions(1, '1', '99')).rejects.toThrow(NotFoundException);
     });
   });
 });

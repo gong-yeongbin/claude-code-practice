@@ -9,6 +9,7 @@
 - 모든 핸들러는 `async`로 선언하고 `Promise<T>` 반환
 - `@Controller('리소스명')`으로 기본 경로 설정
 - HTTP 메서드 데코레이터(`@Get`, `@Post`, `@Delete` 등)와 `@Param`, `@Body` 사용
+- 숫자 경로 파라미터(id·versionNo 등)는 `@Param('id', ParseIntPipe) id: number`로 받아 number로 변환·검증한다. 숫자가 아니면 `400 Bad Request`로 거부된다. (Query 파라미터는 문자열로 받아 Service에서 필요 시 변환)
 - 기본 상태 코드와 다를 경우 `@HttpCode()`로 명시 (예: DELETE → 204)
 - 비즈니스 로직 없이 Service 호출 후 결과 반환만 담당
 - 요청/응답은 DTO로 타입 명시
@@ -20,7 +21,7 @@
 - 데이터 접근은 Repository에 위임, 직접 Prisma 사용 금지
 - 리소스 존재 여부 확인 후 없으면 `NotFoundException` 던지기
 - 엔티티를 ResponseDto로 변환할 때 `ResponseDto.fromEntity()` 정적 메서드 사용
-- ID는 number다. `@Param('id')`로 받은 문자열은 `Number(id)`로 변환 후 Repository에 전달
+- ID는 number다. Controller가 `ParseIntPipe`로 변환·검증해 넘기므로 Service는 `id: number`를 그대로 받아 Repository에 전달한다 (Service에서 `Number(id)` 변환하지 않는다)
 
 ### Repository
 

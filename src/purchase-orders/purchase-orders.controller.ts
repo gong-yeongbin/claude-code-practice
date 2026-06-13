@@ -1,5 +1,5 @@
 // 발주서 생성 HTTP 엔드포인트. 비즈니스 로직 없이 PurchaseOrdersService에 위임
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
@@ -18,18 +18,20 @@ export class PurchaseOrdersController {
   }
 
   @Get(':id')
-  async find(@Param('id') id: string): Promise<PurchaseOrderResponseDto> {
+  async find(@Param('id', ParseIntPipe) id: number): Promise<PurchaseOrderResponseDto> {
     return this.purchaseOrdersService.find(id);
   }
 
   @Get(':id/approval-histories')
-  async findApprovalHistories(@Param('id') id: string): Promise<ChangeRequestResponseDto[]> {
+  async findApprovalHistories(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ChangeRequestResponseDto[]> {
     return this.purchaseOrdersService.findApprovalHistories(id);
   }
 
   @Post(':id/change-requests')
   async requestChange(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateChangeRequestDto,
   ): Promise<ChangeRequestResponseDto> {
     return this.purchaseOrdersService.requestChange(id, dto);
@@ -37,15 +39,15 @@ export class PurchaseOrdersController {
 
   @Get(':id/versions/:versionNo')
   async findVersion(
-    @Param('id') id: string,
-    @Param('versionNo') versionNo: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('versionNo', ParseIntPipe) versionNo: number,
   ): Promise<PurchaseOrderVersionResponseDto> {
     return this.purchaseOrdersService.findVersion(id, versionNo);
   }
 
   @Get(':id/diff')
   async compareVersions(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Query('from') from: string,
     @Query('to') to: string,
   ): Promise<PurchaseOrderVersionDiffResponseDto> {
@@ -54,7 +56,7 @@ export class PurchaseOrdersController {
 
   @Get(':id/snapshot')
   async findSnapshot(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Query('at') at: string,
   ): Promise<PurchaseOrderVersionResponseDto> {
     return this.purchaseOrdersService.findSnapshot(id, at);
