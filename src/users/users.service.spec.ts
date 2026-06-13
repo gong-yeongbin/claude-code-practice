@@ -1,11 +1,11 @@
 // UsersService의 비즈니스 로직을 Repository mock 기반으로 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersRepository } from './users.repository';
 import { UserResponseDto } from './dto/user-response.dto';
 import { CreateUserDto } from './dto/create-user.dto';
-import { User, UserRole } from '@generated/prisma/client';
+import { Prisma, User, UserRole } from '@generated/prisma/client';
 
 describe('UsersService', () => {
   let service: UsersService;
@@ -115,6 +115,18 @@ describe('UsersService', () => {
 
       await expect(service.delete(999)).rejects.toThrow(NotFoundException);
       expect(repository.delete).not.toHaveBeenCalled();
+    });
+
+    it('연관 레코드가 있어 FK 제약(P2003)이 발생하면 ConflictException으로 변환한다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.delete.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('FK violation', {
+          code: 'P2003',
+          clientVersion: 'test',
+        }),
+      );
+
+      await expect(service.delete(1)).rejects.toThrow(ConflictException);
     });
   });
 });

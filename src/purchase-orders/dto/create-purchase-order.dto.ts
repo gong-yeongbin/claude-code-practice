@@ -7,6 +7,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -26,9 +27,13 @@ export class CreatePurchaseOrderDto {
   @Min(1)
   quantity: number;
 
-  // 단가. Decimal(12,2) 정밀도 보존을 위해 문자열로 받음
+  // 단가. Decimal(12,2) 정밀도 보존을 위해 문자열로 받음.
+  // 음수·과도한 소수 자리를 막기 위해 정수부 최대 10자리, 소수부 최대 2자리의 양수만 허용
   @IsNumberString()
   @IsNotEmpty()
+  @Matches(/^\d{1,10}(\.\d{1,2})?$/, {
+    message: 'unitPrice must be a non-negative number with up to 10 integer and 2 decimal digits',
+  })
   unitPrice: string;
 
   @IsDateString()

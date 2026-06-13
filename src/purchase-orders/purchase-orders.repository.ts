@@ -1,5 +1,5 @@
 // 발주서 생성을 담당하는 Repository. 트랜잭션으로 PurchaseOrder와 v1 Version을 함께 생성
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
   ChangeRequest,
@@ -73,7 +73,15 @@ export class PurchaseOrdersRepository {
       },
     });
 
-    return { ...order, currentVersionData: version! };
+    // currentVersion 포인터가 가리키는 버전이 없으면 데이터 정합성이 깨진 상태.
+    // 단언으로 모호하게 크래시하는 대신 명시적으로 실패시켜 로그에 남긴다.
+    if (!version) {
+      throw new Error(
+        `Data integrity error: PurchaseOrder ${id} has no version ${order.currentVersion}`,
+      );
+    }
+
+    return { ...order, currentVersionData: version };
   }
 
   async findApprovalHistories(purchaseOrderId: number): Promise<ChangeRequest[]> {
@@ -92,14 +100,31 @@ export class PurchaseOrdersRepository {
     return pending !== null;
   }
 
+  // 변경요청 생성. 같은 발주서에 대한 동시 생성을 advisory lock으로 직렬화하고,
+  // 락을 잡은 뒤 PENDING 중복을 재확인해 경쟁 조건(중복 PENDING 생성)을 막는다.
+  // 락은 트랜잭션 종료 시 자동 해제된다.
   async createChangeRequest(input: CreateChangeRequestInput): Promise<ChangeRequest> {
-    return this.prisma.changeRequest.create({
-      data: {
-        purchaseOrderId: input.purchaseOrderId,
-        requesterId: input.requesterId,
-        reason: input.reason,
-        changes: input.changes,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${input.purchaseOrderId})`;
+
+      const pending = await tx.changeRequest.findFirst({
+        where: { purchaseOrderId: input.purchaseOrderId, status: ChangeRequestStatus.PENDING },
+        select: { id: true },
+      });
+      if (pending) {
+        throw new ConflictException(
+          `PurchaseOrder ${input.purchaseOrderId} already has a pending change request`,
+        );
+      }
+
+      return tx.changeRequest.create({
+        data: {
+          purchaseOrderId: input.purchaseOrderId,
+          requesterId: input.requesterId,
+          reason: input.reason,
+          changes: input.changes,
+        },
+      });
     });
   }
 

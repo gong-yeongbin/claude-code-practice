@@ -1,5 +1,6 @@
 // ChangeRequestsRepository를 실제 PrismaService와 연결해 DB 조작을 검증하는 통합 테스트 (mock 금지)
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConflictException } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ChangeRequestsRepository } from './change-requests.repository';
@@ -190,6 +191,43 @@ describe('ChangeRequestsRepository', () => {
       // 발주서에 승인된 버전 적용
       const reloaded = await prisma.purchaseOrder.findUnique({ where: { id: order.id } });
       expect(reloaded?.currentVersion).toBe(2);
+    });
+
+    it('동시 승인 시 하나만 성공하고 나머지는 ConflictException으로 막아 v2 중복 생성을 방지한다', async () => {
+      const { order, changeRequest } = await seedScenario();
+      const reviewer = await createUser('소싱', UserRole.SOURCING);
+      const input = {
+        changeRequestId: changeRequest.id,
+        purchaseOrderId: order.id,
+        nextVersionNo: 2,
+        nextVersion: {
+          productName: '코튼 티셔츠',
+          quantity: 1500,
+          unitPrice: '5500.00',
+          deliveryDate: new Date('2026-03-15'),
+          spec: undefined,
+        },
+        reviewerId: reviewer.id,
+        reviewComment: '승인합니다',
+        reviewedAt: new Date(),
+      };
+
+      const results = await Promise.allSettled([
+        repository.applyApproval(input),
+        repository.applyApproval(input),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictException);
+
+      // 버전은 v1, v2 두 개만 존재한다 (중복 insert 없음)
+      const versions = await prisma.purchaseOrderVersion.findMany({
+        where: { purchaseOrderId: order.id },
+      });
+      expect(versions).toHaveLength(2);
     });
   });
 });

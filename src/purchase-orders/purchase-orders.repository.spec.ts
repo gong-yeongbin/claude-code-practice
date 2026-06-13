@@ -1,5 +1,6 @@
 // PurchaseOrdersRepository의 트랜잭션 생성을 실제 PrismaService와 연결해 검증하는 통합 테스트 (mock 금지)
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConflictException } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PurchaseOrdersRepository, CreatePurchaseOrderInput } from './purchase-orders.repository';
@@ -187,6 +188,46 @@ describe('PurchaseOrdersRepository', () => {
       expect(cr.changes).toEqual({ quantity: { old: 1000, new: 1500 } });
       expect(cr.status).toBe('PENDING');
       expect(cr.reviewerId).toBeNull();
+    });
+
+    it('이미 PENDING 변경 요청이 있으면 ConflictException을 던진다', async () => {
+      const po = await repository.create(baseInput());
+      const input = {
+        purchaseOrderId: po.id,
+        requesterId: buyerId,
+        reason: '수량 변경',
+        changes: { quantity: { old: 1000, new: 1500 } },
+      };
+      await repository.createChangeRequest(input);
+
+      await expect(repository.createChangeRequest(input)).rejects.toThrow(ConflictException);
+    });
+
+    it('동시 생성 시 하나만 성공하고 나머지는 ConflictException으로 막는다', async () => {
+      const po = await repository.create(baseInput());
+      const input = {
+        purchaseOrderId: po.id,
+        requesterId: buyerId,
+        reason: '수량 변경',
+        changes: { quantity: { old: 1000, new: 1500 } },
+      };
+
+      const results = await Promise.allSettled([
+        repository.createChangeRequest(input),
+        repository.createChangeRequest(input),
+      ]);
+
+      const fulfilled = results.filter((r) => r.status === 'fulfilled');
+      const rejected = results.filter((r) => r.status === 'rejected');
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].reason).toBeInstanceOf(ConflictException);
+
+      // PENDING 변경요청은 하나만 존재한다
+      const pendings = await prisma.changeRequest.findMany({
+        where: { purchaseOrderId: po.id, status: ChangeRequestStatus.PENDING },
+      });
+      expect(pendings).toHaveLength(1);
     });
   });
 

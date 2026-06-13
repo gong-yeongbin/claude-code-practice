@@ -1,5 +1,5 @@
 // 변경 요청 조회와 승인/반려 처리를 담당하는 Repository
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
   ChangeRequest,
@@ -61,17 +61,32 @@ export class ChangeRequestsRepository {
     return this.prisma.changeRequest.update({ where: { id }, data: input });
   }
 
-  // 승인: 이전 버전 마감 → 다음 버전 insert → 발주서 currentVersion 갱신 → 변경요청 승인 기록을
-  // 하나의 트랜잭션으로 처리한다.
+  // 승인: 변경요청 선점(낙관적 락) → 이전 버전 마감 → 다음 버전 insert → 발주서 currentVersion 갱신을
+  // 하나의 트랜잭션으로 처리한다. 동시 승인 시 두 번째는 ConflictException으로 롤백되어
+  // versionNo 중복 insert(유니크 위반)를 방지한다.
   async applyApproval(input: ApplyApprovalInput): Promise<ChangeRequest> {
     return this.prisma.$transaction(async (tx) => {
-      // 1. 직전까지 유효하던 버전을 마감(validTo 채움)
+      // 1. PENDING일 때만 승인으로 선점한다. 이미 처리됐으면 0건 매칭 → 충돌로 롤백
+      const claimed = await tx.changeRequest.updateMany({
+        where: { id: input.changeRequestId, status: ChangeRequestStatus.PENDING },
+        data: {
+          status: ChangeRequestStatus.APPROVED,
+          reviewerId: input.reviewerId,
+          reviewComment: input.reviewComment,
+          reviewedAt: input.reviewedAt,
+        },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictException(`ChangeRequest ${input.changeRequestId} is already processed`);
+      }
+
+      // 2. 직전까지 유효하던 버전을 마감(validTo 채움)
       await tx.purchaseOrderVersion.updateMany({
         where: { purchaseOrderId: input.purchaseOrderId, validTo: null },
         data: { validTo: input.reviewedAt },
       });
 
-      // 2. changes가 적용된 다음 버전 스냅샷을 insert
+      // 3. changes가 적용된 다음 버전 스냅샷을 insert
       await tx.purchaseOrderVersion.create({
         data: {
           purchaseOrderId: input.purchaseOrderId,
@@ -86,22 +101,14 @@ export class ChangeRequestsRepository {
         },
       });
 
-      // 3. 발주서에 승인된 버전 적용(currentVersion 포인터 이동)
+      // 4. 발주서에 승인된 버전 적용(currentVersion 포인터 이동)
       await tx.purchaseOrder.update({
         where: { id: input.purchaseOrderId },
         data: { currentVersion: input.nextVersionNo },
       });
 
-      // 4. 변경요청을 승인 처리하고 검토 결과 기록
-      return tx.changeRequest.update({
-        where: { id: input.changeRequestId },
-        data: {
-          status: ChangeRequestStatus.APPROVED,
-          reviewerId: input.reviewerId,
-          reviewComment: input.reviewComment,
-          reviewedAt: input.reviewedAt,
-        },
-      });
+      // 5. 승인 처리된 변경요청을 반환
+      return tx.changeRequest.findUniqueOrThrow({ where: { id: input.changeRequestId } });
     });
   }
 }

@@ -1,5 +1,6 @@
 // 발주서 생성 비즈니스 로직. orderNo 채번과 ResponseDto 변환을 담당
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -105,7 +106,11 @@ export class PurchaseOrdersService {
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
-    const version = await this.purchaseOrdersRepository.findVersionAt(id, new Date(at));
+    const atDate = new Date(at);
+    if (Number.isNaN(atDate.getTime())) {
+      throw new BadRequestException(`Invalid date format: ${at}`);
+    }
+    const version = await this.purchaseOrdersRepository.findVersionAt(id, atDate);
     if (!version) {
       throw new NotFoundException(`PurchaseOrder ${id} has no version at ${at}`);
     }
@@ -124,15 +129,18 @@ export class PurchaseOrdersService {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
 
-    const fromVersion = await this.purchaseOrdersRepository.findVersion(
-      purchaseOrderId,
-      Number(from),
-    );
+    const fromNo = Number(from);
+    const toNo = Number(to);
+    if (!Number.isInteger(fromNo) || fromNo < 1 || !Number.isInteger(toNo) || toNo < 1) {
+      throw new BadRequestException('from and to must be positive integers');
+    }
+
+    const fromVersion = await this.purchaseOrdersRepository.findVersion(purchaseOrderId, fromNo);
     if (!fromVersion) {
       throw new NotFoundException(`PurchaseOrder ${id} version ${from} not found`);
     }
 
-    const toVersion = await this.purchaseOrdersRepository.findVersion(purchaseOrderId, Number(to));
+    const toVersion = await this.purchaseOrdersRepository.findVersion(purchaseOrderId, toNo);
     if (!toVersion) {
       throw new NotFoundException(`PurchaseOrder ${id} version ${to} not found`);
     }

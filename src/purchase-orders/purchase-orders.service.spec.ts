@@ -1,6 +1,11 @@
 // PurchaseOrdersService의 생성 로직을 Repository mock 기반으로 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PurchaseOrdersRepository, CreatePurchaseOrderInput } from './purchase-orders.repository';
 import {
@@ -423,6 +428,13 @@ describe('PurchaseOrdersService', () => {
         `PurchaseOrder 1 has no version at ${at}`,
       );
     });
+
+    it('at이 유효한 날짜가 아니면 BadRequestException을 던지고 버전을 조회하지 않는다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+
+      await expect(service.findSnapshot(1, '날짜아님')).rejects.toThrow(BadRequestException);
+      expect(repository.findVersionAt).not.toHaveBeenCalled();
+    });
   });
 
   describe('compareVersions', () => {
@@ -486,6 +498,14 @@ describe('PurchaseOrdersService', () => {
       await expect(service.compareVersions(1, '1', '99')).rejects.toThrow(
         'PurchaseOrder 1 version 99 not found',
       );
+    });
+
+    it('from/to가 정수가 아니면 BadRequestException을 던지고 버전을 조회하지 않는다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+
+      await expect(service.compareVersions(1, '1.5', '2')).rejects.toThrow(BadRequestException);
+      await expect(service.compareVersions(1, 'abc', '2')).rejects.toThrow(BadRequestException);
+      expect(repository.findVersion).not.toHaveBeenCalled();
     });
 
     it('두 버전을 number로 변환해 조회하고 바뀐 모든 필드를 changes로 반환한다', async () => {
