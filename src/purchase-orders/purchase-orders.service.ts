@@ -1,5 +1,10 @@
 // 발주서 생성 비즈니스 로직. orderNo 채번과 ResponseDto 변환을 담당
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PurchaseOrdersRepository } from './purchase-orders.repository';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
@@ -7,7 +12,14 @@ import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-re
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
-import { Prisma } from '../../generated/prisma/client';
+import { OrderStatus, Prisma } from '../../generated/prisma/client';
+
+// CONFIRMED 이상(CONFIRMED→IN_PRODUCTION→COMPLETED)부터 변경 요청이 가능하다
+const CHANGE_REQUESTABLE_STATUSES: OrderStatus[] = [
+  OrderStatus.CONFIRMED,
+  OrderStatus.IN_PRODUCTION,
+  OrderStatus.COMPLETED,
+];
 
 @Injectable()
 export class PurchaseOrdersService {
@@ -43,12 +55,23 @@ export class PurchaseOrdersService {
     return histories.map((h) => ChangeRequestResponseDto.fromEntity(h));
   }
 
-  // 주문자가 특정 발주서에 대한 변경 요청을 생성. 발주서가 없으면 NotFoundException
+  // 주문자가 특정 발주서에 대한 변경 요청을 생성. 발주서가 없으면 NotFoundException.
+  // 주문자(buyer) 본인만 요청 가능하며, 발주서 상태가 CONFIRMED 이상일 때만 허용한다.
   async requestChange(id: string, dto: CreateChangeRequestDto): Promise<ChangeRequestResponseDto> {
     const purchaseOrderId = Number(id);
     const order = await this.purchaseOrdersRepository.findById(purchaseOrderId);
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+
+    if (dto.requesterId !== order.buyerId) {
+      throw new ForbiddenException(`Only the buyer can request changes for PurchaseOrder ${id}`);
+    }
+
+    if (!CHANGE_REQUESTABLE_STATUSES.includes(order.status)) {
+      throw new ConflictException(
+        `PurchaseOrder ${id} is ${order.status}; change requests require CONFIRMED or later status`,
+      );
     }
 
     const changeRequest = await this.purchaseOrdersRepository.createChangeRequest({
@@ -96,7 +119,10 @@ export class PurchaseOrdersService {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
 
-    const fromVersion = await this.purchaseOrdersRepository.findVersion(purchaseOrderId, Number(from));
+    const fromVersion = await this.purchaseOrdersRepository.findVersion(
+      purchaseOrderId,
+      Number(from),
+    );
     if (!fromVersion) {
       throw new NotFoundException(`PurchaseOrder ${id} version ${from} not found`);
     }

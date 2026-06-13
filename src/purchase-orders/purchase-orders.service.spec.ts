@@ -1,6 +1,6 @@
 // PurchaseOrdersService의 생성 로직을 Repository mock 기반으로 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PurchaseOrdersRepository, CreatePurchaseOrderInput } from './purchase-orders.repository';
 import {
@@ -230,8 +230,14 @@ describe('PurchaseOrdersService', () => {
       changes: { quantity: { old: 1000, new: 1500 } },
     };
 
-    it('발주서가 존재하면 변경 요청을 생성하고 ResponseDto를 반환한다', async () => {
-      repository.findById.mockResolvedValue(mockEntity);
+    // CONFIRMED 이상 + 주문자 본인 요청
+    const confirmedEntity: PurchaseOrderWithVersion = {
+      ...mockEntity,
+      status: OrderStatus.CONFIRMED,
+    };
+
+    it('주문자 본인이 CONFIRMED 이상 발주서에 변경 요청하면 생성하고 ResponseDto를 반환한다', async () => {
+      repository.findById.mockResolvedValue(confirmedEntity);
       repository.createChangeRequest.mockResolvedValue(mockChangeRequest);
 
       const result = await service.requestChange('1', dto);
@@ -261,6 +267,37 @@ describe('PurchaseOrdersService', () => {
         'PurchaseOrder 999 not found',
       );
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
+    });
+
+    it('요청자가 주문자(buyer)가 아니면 ForbiddenException을 던지고 생성하지 않는다', async () => {
+      repository.findById.mockResolvedValue(confirmedEntity);
+
+      const otherRequester = { ...dto, requesterId: 999 };
+      await expect(service.requestChange('1', otherRequester)).rejects.toThrow(ForbiddenException);
+      expect(repository.createChangeRequest).not.toHaveBeenCalled();
+    });
+
+    it('발주서 상태가 CONFIRMED 미만(DRAFT)이면 ConflictException을 던지고 생성하지 않는다', async () => {
+      repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.DRAFT });
+
+      await expect(service.requestChange('1', dto)).rejects.toThrow(ConflictException);
+      expect(repository.createChangeRequest).not.toHaveBeenCalled();
+    });
+
+    it('발주서 상태가 PENDING이면 ConflictException을 던지고 생성하지 않는다', async () => {
+      repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.PENDING });
+
+      await expect(service.requestChange('1', dto)).rejects.toThrow(ConflictException);
+      expect(repository.createChangeRequest).not.toHaveBeenCalled();
+    });
+
+    it('발주서 상태가 IN_PRODUCTION이면 변경 요청을 생성한다', async () => {
+      repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.IN_PRODUCTION });
+      repository.createChangeRequest.mockResolvedValue(mockChangeRequest);
+
+      await service.requestChange('1', dto);
+
+      expect(repository.createChangeRequest).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -303,9 +340,7 @@ describe('PurchaseOrdersService', () => {
       repository.findById.mockResolvedValue(null);
 
       await expect(service.findVersion('999', '1')).rejects.toThrow(NotFoundException);
-      await expect(service.findVersion('999', '1')).rejects.toThrow(
-        'PurchaseOrder 999 not found',
-      );
+      await expect(service.findVersion('999', '1')).rejects.toThrow('PurchaseOrder 999 not found');
       expect(repository.findVersion).not.toHaveBeenCalled();
     });
 
