@@ -1,4 +1,5 @@
 // 두 버전 비교 결과. 엔티티가 아니라 두 PurchaseOrderVersion 스냅샷을 비교해 계산한 응답
+import { ApiProperty } from '@nestjs/swagger';
 import { PurchaseOrderVersion } from '@generated/prisma/client';
 
 // 변경된 필드 하나의 이전/이후 값
@@ -9,10 +10,26 @@ export interface VersionFieldChange {
 }
 
 export class PurchaseOrderVersionDiffResponseDto {
+  @ApiProperty({ description: '대상 발주서 ID', example: 1 })
   purchaseOrderId: number;
+  @ApiProperty({ description: '비교 시작 버전 번호', example: 1 })
   fromVersion: number;
+  @ApiProperty({ description: '비교 대상 버전 번호', example: 2 })
   toVersion: number;
   // 두 버전 사이에 실제로 바뀐 필드만 담는다. 동일하면 빈 배열
+  @ApiProperty({
+    type: 'array',
+    description: '두 버전 사이에 실제로 바뀐 필드 목록. 동일하면 빈 배열',
+    items: {
+      type: 'object',
+      properties: {
+        field: { type: 'string' },
+        old: {},
+        new: {},
+      },
+    },
+    example: [{ field: 'quantity', old: 1000, new: 1500 }],
+  })
   changes: VersionFieldChange[];
 
   static fromVersions(

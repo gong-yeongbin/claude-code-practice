@@ -1,10 +1,16 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { User, UserRole } from '@generated/prisma/client';
 
 export class UserResponseDto {
+  @ApiProperty({ description: '사용자 ID', example: 1 })
   id: number;
+  @ApiProperty({ description: '사용자 이름', example: '홍길동' })
   name: string;
+  @ApiProperty({ enum: UserRole, description: '사용자 역할', example: UserRole.BUYER })
   role: UserRole;
+  @ApiProperty({ description: '생성 시각', example: '2026-06-13T00:00:00.000Z' })
   createdAt: Date;
+  @ApiProperty({ description: '수정 시각', example: '2026-06-13T00:00:00.000Z' })
   updatedAt: Date;
 
   static fromEntity(user: User): UserResponseDto {
