@@ -93,6 +93,24 @@ describe('ChangeRequestsRepository', () => {
     });
   });
 
+  describe('findReviewer', () => {
+    it('존재하는 사용자를 반환한다', async () => {
+      const reviewer = await createUser('소싱', UserRole.SOURCING);
+
+      const found = await repository.findReviewer(reviewer.id);
+
+      expect(found).not.toBeNull();
+      expect(found?.id).toBe(reviewer.id);
+      expect(found?.role).toBe(UserRole.SOURCING);
+    });
+
+    it('존재하지 않는 id면 null을 반환한다', async () => {
+      const found = await repository.findReviewer(999999);
+
+      expect(found).toBeNull();
+    });
+  });
+
   describe('findCurrentVersion', () => {
     it('validTo가 NULL인 현재 유효 버전을 반환한다', async () => {
       const { order } = await seedScenario();

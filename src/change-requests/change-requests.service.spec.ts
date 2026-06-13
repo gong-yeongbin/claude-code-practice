@@ -1,6 +1,6 @@
 // ChangeRequestsService의 승인/반려 비즈니스 로직을 Repository mock 기반으로 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ChangeRequestsService } from './change-requests.service';
 import { ChangeRequestsRepository } from './change-requests.repository';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
@@ -10,6 +10,7 @@ import {
   ChangeRequestStatus,
   Prisma,
   PurchaseOrderVersion,
+  UserRole,
 } from '../../generated/prisma/client';
 
 describe('ChangeRequestsService', () => {
@@ -19,6 +20,14 @@ describe('ChangeRequestsService', () => {
     updateReview: jest.Mock;
     findCurrentVersion: jest.Mock;
     applyApproval: jest.Mock;
+    findReviewer: jest.Mock;
+  };
+
+  // 권한 검증을 통과하는 기본 검토자(소싱팀)
+  const sourcingReviewer = {
+    id: 3,
+    name: '소싱 담당자',
+    role: UserRole.SOURCING,
   };
 
   const mockEntity: ChangeRequest = {
@@ -66,7 +75,10 @@ describe('ChangeRequestsService', () => {
       updateReview: jest.fn(),
       findCurrentVersion: jest.fn(),
       applyApproval: jest.fn(),
+      findReviewer: jest.fn(),
     };
+    // 기본적으로 검토자는 소싱팀이라고 가정한다 (권한 케이스에서 개별 override)
+    repository.findReviewer.mockResolvedValue(sourcingReviewer);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -249,6 +261,36 @@ describe('ChangeRequestsService', () => {
         1,
         expect.objectContaining({ reviewComment: null }),
       );
+    });
+  });
+
+  describe('review - 권한', () => {
+    it('검토자가 소싱팀(SOURCING)이 아니면 ForbiddenException을 던지고 변경요청을 조회하지 않는다', async () => {
+      repository.findReviewer.mockResolvedValue({
+        id: 3,
+        name: '주문자',
+        role: UserRole.BUYER,
+      });
+
+      const dto: ReviewChangeRequestDto = {
+        status: ChangeRequestStatus.APPROVED,
+        reviewerId: 3,
+      };
+      await expect(service.review('1', dto)).rejects.toThrow(ForbiddenException);
+      expect(repository.findReviewer).toHaveBeenCalledWith(3);
+      expect(repository.findById).not.toHaveBeenCalled();
+    });
+
+    it('검토자가 존재하지 않으면 ForbiddenException을 던진다', async () => {
+      repository.findReviewer.mockResolvedValue(null);
+
+      const dto: ReviewChangeRequestDto = {
+        status: ChangeRequestStatus.REJECTED,
+        reviewerId: 999,
+        reviewComment: '권한 없음',
+      };
+      await expect(service.review('1', dto)).rejects.toThrow(ForbiddenException);
+      expect(repository.findById).not.toHaveBeenCalled();
     });
   });
 

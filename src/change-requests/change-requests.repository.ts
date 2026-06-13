@@ -6,6 +6,7 @@ import {
   ChangeRequestStatus,
   Prisma,
   PurchaseOrderVersion,
+  User,
 } from '../../generated/prisma/client';
 
 // 반려 처리 시 갱신할 검토 결과
@@ -42,6 +43,11 @@ export class ChangeRequestsRepository {
 
   async findById(id: number): Promise<ChangeRequest | null> {
     return this.prisma.changeRequest.findUnique({ where: { id } });
+  }
+
+  // 승인/반려 권한 검증을 위해 검토자(users.id)를 조회
+  async findReviewer(id: number): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { id } });
   }
 
   // 발주서의 현재 유효 버전(validTo가 NULL인 스냅샷)을 조회

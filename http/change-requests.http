@@ -79,6 +79,17 @@ Content-Type: application/json
   "reviewComment": "검토 결과 승인합니다"
 }
 
+### 소싱팀이 아닌 검토자의 승인 시도 (403 Forbidden — 승인/반려는 소싱팀만 가능)
+# reviewerId에 주문자(BUYER)를 넣으면 권한이 없어 거부된다.
+PATCH {{host}}/change-requests/{{changeRequestId}}
+Content-Type: application/json
+
+{
+  "status": "APPROVED",
+  "reviewerId": {{buyerId}},
+  "reviewComment": "권한 없는 사용자의 승인 시도"
+}
+
 ### 승인 결과 확인 (발주서를 재조회해 currentVersion 증가와 변경 내용 반영을 확인)
 GET {{host}}/purchase-orders/{{purchaseOrderId}}
 Accept: application/json

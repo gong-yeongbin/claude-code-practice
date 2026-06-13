@@ -1,6 +1,11 @@
 // 변경 요청 승인/반려 비즈니스 로직. 상태 전이 검증과 검토 결과 기록을 담당하며,
 // 승인 시에는 changes를 적용한 다음 버전을 발주서에 반영한다.
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ChangeRequestsRepository, NextVersionFields } from './change-requests.repository';
 import { ReviewChangeRequestDto } from './dto/review-change-request.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
@@ -9,6 +14,7 @@ import {
   ChangeRequestStatus,
   Prisma,
   PurchaseOrderVersion,
+  UserRole,
 } from '../../generated/prisma/client';
 
 @Injectable()
@@ -18,6 +24,8 @@ export class ChangeRequestsService {
   // 변경 요청을 승인/반려하고 검토자·의견·검토시각을 기록한다.
   // 대상이 없으면 NotFoundException, 이미 처리된(PENDING이 아닌) 요청이면 ConflictException
   async review(id: string, dto: ReviewChangeRequestDto): Promise<ChangeRequestResponseDto> {
+    await this.assertReviewerIsSourcing(dto.reviewerId);
+
     const changeRequestId = Number(id);
     const changeRequest = await this.changeRequestsRepository.findById(changeRequestId);
     if (!changeRequest) {
@@ -38,6 +46,16 @@ export class ChangeRequestsService {
             reviewedAt,
           });
     return ChangeRequestResponseDto.fromEntity(updated);
+  }
+
+  // 승인/반려는 소싱팀(SOURCING)만 가능하다. 검토자가 없거나 소싱팀이 아니면 ForbiddenException
+  private async assertReviewerIsSourcing(reviewerId: number): Promise<void> {
+    const reviewer = await this.changeRequestsRepository.findReviewer(reviewerId);
+    if (!reviewer || reviewer.role !== UserRole.SOURCING) {
+      throw new ForbiddenException(
+        `User ${reviewerId} is not authorized to review change requests`,
+      );
+    }
   }
 
   // 승인 처리. 현재 버전에 changes를 적용한 다음 버전을 만들어 발주서에 반영한다.

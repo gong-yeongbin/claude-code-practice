@@ -1,6 +1,6 @@
 // ChangeRequestsController의 HTTP 핸들러가 Service에 올바르게 위임하는지 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ChangeRequestsController } from './change-requests.controller';
 import { ChangeRequestsService } from './change-requests.service';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
@@ -64,6 +64,18 @@ describe('ChangeRequestsController', () => {
       service.review.mockRejectedValue(new NotFoundException('ChangeRequest 999 not found'));
 
       await expect(controller.review('999', dto)).rejects.toThrow(NotFoundException);
+    });
+
+    it('소싱팀이 아니어서 service가 던진 ForbiddenException을 그대로 전파한다', async () => {
+      const dto: ReviewChangeRequestDto = {
+        status: ChangeRequestStatus.APPROVED,
+        reviewerId: 2,
+      };
+      service.review.mockRejectedValue(
+        new ForbiddenException('User 2 is not authorized to review change requests'),
+      );
+
+      await expect(controller.review('1', dto)).rejects.toThrow(ForbiddenException);
     });
 
     it('이미 처리되어 service가 던진 ConflictException을 그대로 전파한다', async () => {
