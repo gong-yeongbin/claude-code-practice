@@ -214,4 +214,32 @@ describe('PurchaseOrdersRepository', () => {
       expect(version).toBeNull();
     });
   });
+
+  describe('findVersionAt', () => {
+    it('validFrom 이후 시각이면 해당 버전을 반환한다', async () => {
+      const created = await repository.create(baseInput());
+      const afterCreation = new Date(created.currentVersionData.validFrom.getTime() + 1000);
+
+      const version = await repository.findVersionAt(created.id, afterCreation);
+
+      expect(version).not.toBeNull();
+      expect(version!.purchaseOrderId).toBe(created.id);
+      expect(version!.versionNo).toBe(1);
+    });
+
+    it('validFrom 이전 시각이면 null을 반환한다', async () => {
+      const created = await repository.create(baseInput());
+      const beforeCreation = new Date(created.currentVersionData.validFrom.getTime() - 1000);
+
+      const version = await repository.findVersionAt(created.id, beforeCreation);
+
+      expect(version).toBeNull();
+    });
+
+    it('존재하지 않는 발주서 id면 null을 반환한다', async () => {
+      const version = await repository.findVersionAt(999999, new Date());
+
+      expect(version).toBeNull();
+    });
+  });
 });

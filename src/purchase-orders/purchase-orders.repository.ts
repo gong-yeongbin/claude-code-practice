@@ -99,4 +99,14 @@ export class PurchaseOrdersRepository {
       where: { purchaseOrderId_versionNo: { purchaseOrderId, versionNo } },
     });
   }
+
+  async findVersionAt(purchaseOrderId: number, at: Date): Promise<PurchaseOrderVersion | null> {
+    return this.prisma.purchaseOrderVersion.findFirst({
+      where: {
+        purchaseOrderId,
+        validFrom: { lte: at },
+        OR: [{ validTo: { gt: at } }, { validTo: null }],
+      },
+    });
+  }
 }

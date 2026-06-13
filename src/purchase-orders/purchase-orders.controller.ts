@@ -1,5 +1,5 @@
 // 발주서 생성 HTTP 엔드포인트. 비즈니스 로직 없이 PurchaseOrdersService에 위임
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
@@ -40,5 +40,13 @@ export class PurchaseOrdersController {
     @Param('versionNo') versionNo: string,
   ): Promise<PurchaseOrderVersionResponseDto> {
     return this.purchaseOrdersService.findVersion(id, versionNo);
+  }
+
+  @Get(':id/snapshot')
+  async findSnapshot(
+    @Param('id') id: string,
+    @Query('at') at: string,
+  ): Promise<PurchaseOrderVersionResponseDto> {
+    return this.purchaseOrdersService.findSnapshot(id, at);
   }
 }

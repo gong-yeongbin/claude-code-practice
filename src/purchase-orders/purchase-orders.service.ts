@@ -71,6 +71,18 @@ export class PurchaseOrdersService {
     return PurchaseOrderVersionResponseDto.fromEntity(version);
   }
 
+  async findSnapshot(id: string, at: string): Promise<PurchaseOrderVersionResponseDto> {
+    const order = await this.purchaseOrdersRepository.findById(Number(id));
+    if (!order) {
+      throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+    const version = await this.purchaseOrdersRepository.findVersionAt(Number(id), new Date(at));
+    if (!version) {
+      throw new NotFoundException(`PurchaseOrder ${id} has no version at ${at}`);
+    }
+    return PurchaseOrderVersionResponseDto.fromEntity(version);
+  }
+
   // 발주 번호 채번. PO-yyyyMMddHHmmss-랜덤4자리로 사람이 읽기 쉬운 번호 생성
   private generateOrderNo(): string {
     const now = new Date();
