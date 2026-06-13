@@ -15,7 +15,7 @@ import {
   Prisma,
   PurchaseOrderVersion,
   UserRole,
-} from '../../generated/prisma/client';
+} from '@generated/prisma/client';
 
 @Injectable()
 export class ChangeRequestsService {

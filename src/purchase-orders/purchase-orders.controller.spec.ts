@@ -9,7 +9,7 @@ import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-versio
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
-import { ChangeRequestStatus, OrderStatus } from '../../generated/prisma/client';
+import { ChangeRequestStatus, OrderStatus } from '@generated/prisma/client';
 
 describe('PurchaseOrdersController', () => {
   let controller: PurchaseOrdersController;

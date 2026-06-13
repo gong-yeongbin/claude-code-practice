@@ -5,7 +5,7 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { UserResponseDto } from './dto/user-response.dto';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UserRole } from '../../generated/prisma/client';
+import { UserRole } from '@generated/prisma/client';
 
 describe('UsersController', () => {
   let controller: UsersController;

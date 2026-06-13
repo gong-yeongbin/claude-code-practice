@@ -2,7 +2,7 @@
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { ReviewChangeRequestDto } from './review-change-request.dto';
-import { ChangeRequestStatus } from '../../../generated/prisma/client';
+import { ChangeRequestStatus } from '@generated/prisma/client';
 
 describe('ReviewChangeRequestDto', () => {
   async function validateDto(payload: Record<string, unknown>) {

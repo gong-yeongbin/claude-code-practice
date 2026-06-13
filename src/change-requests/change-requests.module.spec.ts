@@ -1,6 +1,6 @@
 // ChangeRequestsModule의 DI 배선이 올바른지 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaModule } from '../prisma/prisma.module';
+import { PrismaModule } from '@/prisma/prisma.module';
 import { ChangeRequestsModule } from './change-requests.module';
 import { ChangeRequestsController } from './change-requests.controller';
 import { ChangeRequestsService } from './change-requests.service';

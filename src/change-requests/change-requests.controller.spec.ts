@@ -5,7 +5,7 @@ import { ChangeRequestsController } from './change-requests.controller';
 import { ChangeRequestsService } from './change-requests.service';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { ReviewChangeRequestDto } from './dto/review-change-request.dto';
-import { ChangeRequestStatus } from '../../generated/prisma/client';
+import { ChangeRequestStatus } from '@generated/prisma/client';
 
 describe('ChangeRequestsController', () => {
   let controller: ChangeRequestsController;

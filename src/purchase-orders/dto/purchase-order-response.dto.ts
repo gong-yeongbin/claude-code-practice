@@ -1,5 +1,5 @@
 // 발주서 생성 응답. PurchaseOrder 메타와 생성된 v1 버전의 도메인 필드를 합쳐 노출
-import { PurchaseOrder, PurchaseOrderVersion, OrderStatus } from '../../../generated/prisma/client';
+import { PurchaseOrder, PurchaseOrderVersion, OrderStatus } from '@generated/prisma/client';
 
 // Repository.create가 반환하는, 발주서와 현재 버전을 합친 구조
 export type PurchaseOrderWithVersion = PurchaseOrder & {

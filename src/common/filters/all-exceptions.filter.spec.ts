@@ -1,7 +1,7 @@
 // AllExceptionsFilter가 예외를 ApiResponse 에러 구조로 변환하는지 검증하는 유닛 테스트
 import { ArgumentsHost, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { AllExceptionsFilter } from './all-exceptions.filter';
-import { ApiResponse } from '../dto/api-response.dto';
+import { ApiResponse } from '@/common/dto/api-response.dto';
 
 describe('AllExceptionsFilter', () => {
   let filter: AllExceptionsFilter;

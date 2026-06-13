@@ -1,5 +1,5 @@
 // 발주서 특정 버전 조회 응답. PurchaseOrderVersion 스냅샷 필드를 노출
-import { PurchaseOrderVersion } from '../../../generated/prisma/client';
+import { PurchaseOrderVersion } from '@generated/prisma/client';
 
 export class PurchaseOrderVersionResponseDto {
   id: number;

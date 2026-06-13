@@ -1,13 +1,13 @@
 // 변경 요청 조회와 승인/반려 처리를 담당하는 Repository
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '@/prisma/prisma.service';
 import {
   ChangeRequest,
   ChangeRequestStatus,
   Prisma,
   PurchaseOrderVersion,
   User,
-} from '../../generated/prisma/client';
+} from '@generated/prisma/client';
 
 // 반려 처리 시 갱신할 검토 결과
 export interface UpdateReviewInput {

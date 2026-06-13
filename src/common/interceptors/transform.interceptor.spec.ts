@@ -3,7 +3,7 @@ import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { lastValueFrom, of } from 'rxjs';
 import { TransformInterceptor } from './transform.interceptor';
-import { ApiResponse } from '../dto/api-response.dto';
+import { ApiResponse } from '@/common/dto/api-response.dto';
 
 describe('TransformInterceptor', () => {
   let interceptor: TransformInterceptor<unknown>;

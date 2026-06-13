@@ -1,9 +1,9 @@
 // ChangeRequestsRepository를 실제 PrismaService와 연결해 DB 조작을 검증하는 통합 테스트 (mock 금지)
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaModule } from '../prisma/prisma.module';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaModule } from '@/prisma/prisma.module';
+import { PrismaService } from '@/prisma/prisma.service';
 import { ChangeRequestsRepository } from './change-requests.repository';
-import { ChangeRequestStatus, UserRole } from '../../generated/prisma/client';
+import { ChangeRequestStatus, UserRole } from '@generated/prisma/client';
 
 describe('ChangeRequestsRepository', () => {
   let repository: ChangeRequestsRepository;

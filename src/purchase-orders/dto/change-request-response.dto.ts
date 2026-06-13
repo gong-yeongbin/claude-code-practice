@@ -1,5 +1,5 @@
 // 발주서 변경 요청 응답. ChangeRequest 엔티티를 그대로 노출
-import { ChangeRequest, ChangeRequestStatus } from '../../../generated/prisma/client';
+import { ChangeRequest, ChangeRequestStatus } from '@generated/prisma/client';
 
 export class ChangeRequestResponseDto {
   id: number;

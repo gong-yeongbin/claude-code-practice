@@ -3,8 +3,8 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Reflector } from '@nestjs/core';
 import { Request, Response } from 'express';
 import { Observable, map } from 'rxjs';
-import { ApiResponse } from '../dto/api-response.dto';
-import { RESPONSE_MESSAGE } from '../decorators/response-message.decorator';
+import { ApiResponse } from '@/common/dto/api-response.dto';
+import { RESPONSE_MESSAGE } from '@/common/decorators/response-message.decorator';
 
 @Injectable()
 export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T> | T> {

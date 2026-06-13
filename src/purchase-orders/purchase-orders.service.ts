@@ -12,7 +12,7 @@ import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-re
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
-import { OrderStatus, Prisma } from '../../generated/prisma/client';
+import { OrderStatus, Prisma } from '@generated/prisma/client';
 
 // CONFIRMED 이상(CONFIRMED→IN_PRODUCTION→COMPLETED)부터 변경 요청이 가능하다
 const CHANGE_REQUESTABLE_STATUSES: OrderStatus[] = [

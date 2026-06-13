@@ -16,7 +16,7 @@ import {
   OrderStatus,
   Prisma,
   PurchaseOrderVersion,
-} from '../../generated/prisma/client';
+} from '@generated/prisma/client';
 import { CreateChangeRequestInput } from './purchase-orders.repository';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';

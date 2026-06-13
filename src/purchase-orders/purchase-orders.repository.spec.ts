@@ -1,9 +1,9 @@
 // PurchaseOrdersRepository의 트랜잭션 생성을 실제 PrismaService와 연결해 검증하는 통합 테스트 (mock 금지)
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaModule } from '../prisma/prisma.module';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaModule } from '@/prisma/prisma.module';
+import { PrismaService } from '@/prisma/prisma.service';
 import { PurchaseOrdersRepository, CreatePurchaseOrderInput } from './purchase-orders.repository';
-import { ChangeRequestStatus, UserRole } from '../../generated/prisma/client';
+import { ChangeRequestStatus, UserRole } from '@generated/prisma/client';
 
 describe('PurchaseOrdersRepository', () => {
   let repository: PurchaseOrdersRepository;

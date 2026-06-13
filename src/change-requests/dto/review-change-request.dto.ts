@@ -1,6 +1,6 @@
 // 변경 요청 승인/반려 본문. 소싱팀이 상태와 검토자, 검토 의견을 담아 전달
 import { IsIn, IsInt, IsNotEmpty, IsString, Min, ValidateIf } from 'class-validator';
-import { ChangeRequestStatus } from '../../../generated/prisma/client';
+import { ChangeRequestStatus } from '@generated/prisma/client';
 
 export class ReviewChangeRequestDto {
   // 변경할 상태. 승인(APPROVED) 또는 반려(REJECTED)만 허용

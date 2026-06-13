@@ -1,5 +1,5 @@
 // 두 버전 비교 결과. 엔티티가 아니라 두 PurchaseOrderVersion 스냅샷을 비교해 계산한 응답
-import { PurchaseOrderVersion } from '../../../generated/prisma/client';
+import { PurchaseOrderVersion } from '@generated/prisma/client';
 
 // 변경된 필드 하나의 이전/이후 값
 export interface VersionFieldChange {
