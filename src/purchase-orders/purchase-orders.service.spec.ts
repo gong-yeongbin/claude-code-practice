@@ -397,18 +397,18 @@ describe('PurchaseOrdersService', () => {
       changes: { quantity: { old: 1000, new: 1500 } },
     };
 
-    // PENDING + 주문자 본인 요청
-    const pendingEntity: PurchaseOrderWithVersion = {
+    // CONFIRMED + 주문자 본인 요청
+    const confirmedEntity: PurchaseOrderWithVersion = {
       ...mockEntity,
-      status: OrderStatus.PENDING,
+      status: OrderStatus.CONFIRMED,
     };
 
     beforeEach(() => {
       repository.findUser.mockResolvedValue(mockBuyerUser);
     });
 
-    it('주문자 본인이 PENDING 발주서에 변경 요청하면 생성하고 ResponseDto를 반환한다', async () => {
-      repository.findById.mockResolvedValue(pendingEntity);
+    it('주문자 본인이 CONFIRMED 발주서에 변경 요청하면 생성하고 ResponseDto를 반환한다', async () => {
+      repository.findById.mockResolvedValue(confirmedEntity);
       repository.existsPendingChangeRequest.mockResolvedValue(false);
       repository.createChangeRequest.mockResolvedValue(mockChangeRequest);
 
@@ -440,7 +440,7 @@ describe('PurchaseOrdersService', () => {
     });
 
     it('요청자 계정이 존재하지 않으면 NotFoundException을 던지고 생성하지 않는다', async () => {
-      repository.findById.mockResolvedValue(pendingEntity);
+      repository.findById.mockResolvedValue(confirmedEntity);
       repository.findUser.mockResolvedValue(null);
 
       await expect(service.requestChange(1, dto)).rejects.toThrow(NotFoundException);
@@ -449,28 +449,28 @@ describe('PurchaseOrdersService', () => {
     });
 
     it('요청자가 주문자(buyer)가 아니면 ForbiddenException을 던지고 생성하지 않는다', async () => {
-      repository.findById.mockResolvedValue(pendingEntity);
+      repository.findById.mockResolvedValue(confirmedEntity);
 
       const otherRequester = { ...dto, requesterId: 999 };
       await expect(service.requestChange(1, otherRequester)).rejects.toThrow(ForbiddenException);
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
 
-    it('발주서 상태가 DRAFT이면 ConflictException을 던지고 생성하지 않는다', async () => {
+    it('발주서 상태가 DRAFT이면(CONFIRMED가 아니므로) ConflictException을 던지고 생성하지 않는다', async () => {
       repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.DRAFT });
 
       await expect(service.requestChange(1, dto)).rejects.toThrow(ConflictException);
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
 
-    it('발주서 상태가 CONFIRMED이면(PENDING이 아니므로) ConflictException을 던지고 생성하지 않는다', async () => {
-      repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.CONFIRMED });
+    it('발주서 상태가 PENDING이면(CONFIRMED가 아니므로) ConflictException을 던지고 생성하지 않는다', async () => {
+      repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.PENDING });
 
       await expect(service.requestChange(1, dto)).rejects.toThrow(ConflictException);
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
 
-    it('발주서 상태가 IN_PRODUCTION이면(PENDING이 아니므로) ConflictException을 던지고 생성하지 않는다', async () => {
+    it('발주서 상태가 IN_PRODUCTION이면(CONFIRMED가 아니므로) ConflictException을 던지고 생성하지 않는다', async () => {
       repository.findById.mockResolvedValue({ ...mockEntity, status: OrderStatus.IN_PRODUCTION });
 
       await expect(service.requestChange(1, dto)).rejects.toThrow(ConflictException);
@@ -478,7 +478,7 @@ describe('PurchaseOrdersService', () => {
     });
 
     it('동일 발주서에 PENDING 변경 요청이 있으면 ConflictException을 던지고 생성하지 않는다', async () => {
-      repository.findById.mockResolvedValue(pendingEntity);
+      repository.findById.mockResolvedValue(confirmedEntity);
       repository.existsPendingChangeRequest.mockResolvedValue(true);
 
       await expect(service.requestChange(1, dto)).rejects.toThrow(ConflictException);
