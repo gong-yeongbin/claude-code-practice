@@ -61,7 +61,7 @@ pnpm run start:dev
 
 IntelliJ Ultimate나 WebStorm은 HTTP Client가 기본 내장이고, Community면 **HTTP Client** 플러그인을 깔아야 합니다.
 
-쓰는 법은 대충 이렇습니다.
+쓰는 법은 이렇습니다.
 
 1. `.http` 파일을 엽니다.
 2. 편집기 우상단 드롭다운에서 환경을 `local`로 고릅니다. 그래야 요청의 `{{host}}`가 `http://localhost:3000`으로 치환됩니다. (값은 `http/http-client.env.json`에 있어요.)
