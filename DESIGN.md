@@ -170,20 +170,6 @@ return this.prisma.purchaseOrderVersion.findFirst({
 | 존재하지 않는 발주서 조회 | `NotFoundException` (`PurchaseOrder {id} not found`) |
 | 존재하지 않는 버전 번호 조회 | `NotFoundException` (`version {n} not found`) |
 | 해당 시점에 유효한 버전이 없음 (발주서 생성 이전 날짜 등) | `NotFoundException` (`has no version at {at}`) |
-| 잘못된 날짜 형식 / 존재하지 않는 날짜(예: `2026-02-31`) | `kstStartOfDay`가 `null` 반환 → `BadRequestException` |
 | diff의 `from`/`to`가 양의 정수가 아님 | `BadRequestException` |
-| 동시 승인 경쟁 (두 검토자가 같은 요청을 동시에 승인) | 트랜잭션 내 `updateMany`로 `PENDING` 선점 → 진 쪽은 0건 매칭 → `ConflictException` 롤백, `version_no` 중복 insert 방지 |
+| 동시 승인 (두 검토자가 같은 요청을 동시에 승인) | 트랜잭션 내 `updateMany`로 `PENDING` 선점 → 진 쪽은 0건 매칭 → `ConflictException` 롤백, `version_no` 중복 insert 방지 |
 | 동시 변경 요청 생성 (같은 발주서에 PENDING 중복 생성 시도) | `pg_advisory_xact_lock`으로 직렬화 후 PENDING 중복 재확인 → `ConflictException` |
-| 데이터 불일치 (`current_version`이 가리키는 버전 행이 없음) | 모호한 크래시 대신 명시적 `Error`를 던져서 로그에 정합성 오류로 남깁니다 |
-
-## 부록 — 관련 API
-
-| 메서드 | 경로 | 설명 |
-|--------|------|------|
-| `GET` | `/purchase-orders/:id` | 발주서 + 현재 버전 스냅샷 |
-| `GET` | `/purchase-orders/:id/versions/:versionNo` | 특정 버전 스냅샷 |
-| `GET` | `/purchase-orders/:id/snapshot?at=YYYY-MM-DD` | 특정 시점에 유효했던 버전 |
-| `GET` | `/purchase-orders/:id/diff?from=&to=` | 두 버전 간 변경 필드 비교 |
-| `GET` | `/purchase-orders/:id/approval-histories` | 승인된 변경 이력(델타) 목록 |
-| `POST` | `/purchase-orders/:id/change-requests` | 변경 요청 생성 |
-| `PATCH` | `/change-requests/:id` | 변경 요청 승인/반려 |
