@@ -88,6 +88,14 @@ describe('PurchaseOrdersService', () => {
     updatedAt: new Date('2026-01-01T00:00:00Z'),
   };
 
+  const mockBuyerUser: User = {
+    id: 10,
+    name: '주문담당',
+    role: UserRole.BUYER,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    updatedAt: new Date('2026-01-01T00:00:00Z'),
+  };
+
   beforeEach(async () => {
     repository = {
       create: jest.fn<Promise<PurchaseOrderWithVersion>, [CreatePurchaseOrderInput]>(),
@@ -122,10 +130,12 @@ describe('PurchaseOrdersService', () => {
     };
 
     it('도메인 필드와 서버생성 orderNo로 repository.create를 호출하고 ResponseDto를 반환한다', async () => {
+      repository.findUser.mockResolvedValue(mockBuyerUser);
       repository.create.mockResolvedValue(mockEntity);
 
       const result = await service.create(dto);
 
+      expect(repository.findUser).toHaveBeenCalledWith(10);
       expect(repository.create).toHaveBeenCalledTimes(1);
       const arg = repository.create.mock.calls[0][0];
       expect(arg.buyerId).toBe(10);
@@ -151,6 +161,7 @@ describe('PurchaseOrdersService', () => {
     });
 
     it('spec이 없으면 undefined를 그대로 repository에 전달한다', async () => {
+      repository.findUser.mockResolvedValue(mockBuyerUser);
       repository.create.mockResolvedValue({
         ...mockEntity,
         currentVersionData: { ...mockEntity.currentVersionData, spec: null },
@@ -168,6 +179,20 @@ describe('PurchaseOrdersService', () => {
       const arg = repository.create.mock.calls[0][0];
       expect(arg.spec).toBeUndefined();
       expect(result.spec).toBeNull();
+    });
+
+    it('buyerId 사용자가 존재하지 않으면 ForbiddenException을 던지고 생성하지 않는다', async () => {
+      repository.findUser.mockResolvedValue(null);
+
+      await expect(service.create(dto)).rejects.toThrow(ForbiddenException);
+      expect(repository.create).not.toHaveBeenCalled();
+    });
+
+    it('buyerId 사용자의 역할이 BUYER가 아니면 ForbiddenException을 던지고 생성하지 않는다', async () => {
+      repository.findUser.mockResolvedValue({ ...mockBuyerUser, role: UserRole.SOURCING });
+
+      await expect(service.create(dto)).rejects.toThrow(ForbiddenException);
+      expect(repository.create).not.toHaveBeenCalled();
     });
   });
 

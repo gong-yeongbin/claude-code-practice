@@ -2,7 +2,7 @@
 # 실행 전 우상단에서 환경(local)을 선택한다. host 값은 http-client.env.json 참조.
 # buyerId·경로의 id(예: /purchase-orders/1)는 placeholder다. 실제 응답에서 받은 id로 바꿔 실행한다.
 
-### 발주서 생성 (buyerId는 users.http에서 만든 BUYER의 실제 id로 바꾼다)
+### 발주서 생성 (buyerId는 users.http에서 만든 BUYER의 실제 id로 바꾼다. BUYER 역할 계정만 생성 가능, 아니면 403)
 POST {{host}}/purchase-orders
 Content-Type: application/json
 

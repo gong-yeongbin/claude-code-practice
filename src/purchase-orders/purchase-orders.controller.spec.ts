@@ -1,6 +1,6 @@
 // PurchaseOrdersController의 생성 핸들러가 Service에 올바르게 위임하는지 검증하는 유닛 테스트
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PurchaseOrdersController } from './purchase-orders.controller';
 import { PurchaseOrdersService } from './purchase-orders.service';
 import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
@@ -100,6 +100,12 @@ describe('PurchaseOrdersController', () => {
       service.create.mockRejectedValue(new BadRequestException('invalid'));
 
       await expect(controller.create(dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('BUYER 계정이 아니어서 service가 ForbiddenException을 던지면 그대로 전파한다', async () => {
+      service.create.mockRejectedValue(new ForbiddenException('Only a BUYER account can create'));
+
+      await expect(controller.create(dto)).rejects.toThrow(ForbiddenException);
     });
   });
 

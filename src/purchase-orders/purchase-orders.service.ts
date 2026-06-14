@@ -22,7 +22,13 @@ import { kstStartOfDay } from '@/common/utils/date-format';
 export class PurchaseOrdersService {
   constructor(private readonly purchaseOrdersRepository: PurchaseOrdersRepository) {}
 
+  // 발주서를 생성한다. 생성 주체(buyerId)가 BUYER 역할 계정일 때만 허용한다.
   async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrderResponseDto> {
+    const buyer = await this.purchaseOrdersRepository.findUser(dto.buyerId);
+    if (!buyer || buyer.role !== UserRole.BUYER) {
+      throw new ForbiddenException('Only a BUYER account can create a PurchaseOrder');
+    }
+
     const order = await this.purchaseOrdersRepository.create({
       orderNo: this.generateOrderNo(),
       buyerId: dto.buyerId,

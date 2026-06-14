@@ -18,9 +18,10 @@ export class PurchaseOrdersController {
   constructor(private readonly purchaseOrdersService: PurchaseOrdersService) {}
 
   @Post()
-  @ApiOperation({ summary: '발주서 생성' })
+  @ApiOperation({ summary: '발주서 생성', description: 'BUYER 역할 계정만 생성 가능.' })
   @ApiWrappedResponse(PurchaseOrderResponseDto, { status: 201, description: '생성된 발주서' })
   @ApiErrorResponse(400, '요청 본문 검증 실패')
+  @ApiErrorResponse(403, 'BUYER 계정이 아님')
   async create(@Body() dto: CreatePurchaseOrderDto): Promise<PurchaseOrderResponseDto> {
     return this.purchaseOrdersService.create(dto);
   }
