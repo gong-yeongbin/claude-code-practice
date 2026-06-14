@@ -1,7 +1,7 @@
 // KST 날짜 포맷 유틸 검증
 import {
   deepConvertDatesToKst,
-  kstStartOfDay,
+  kstEndOfDay,
   toDateOnlyString,
   toKstIsoString,
 } from './date-format';
@@ -27,20 +27,20 @@ describe('date-format', () => {
     });
   });
 
-  describe('kstStartOfDay', () => {
-    it('YYYY-MM-DD를 KST 그 날 시작(00:00+09:00 = 전날 15:00 UTC) 시각으로 변환한다', () => {
-      expect(kstStartOfDay('2026-02-15')).toEqual(new Date('2026-02-14T15:00:00.000Z'));
+  describe('kstEndOfDay', () => {
+    it('YYYY-MM-DD를 KST 그 날 끝(23:59:59.999+09:00 = 당일 14:59:59.999 UTC) 시각으로 변환한다', () => {
+      expect(kstEndOfDay('2026-02-15')).toEqual(new Date('2026-02-15T14:59:59.999Z'));
     });
 
     it('형식이 YYYY-MM-DD가 아니면 null을 반환한다', () => {
-      expect(kstStartOfDay('2026-02-15T00:00:00Z')).toBeNull();
-      expect(kstStartOfDay('날짜아님')).toBeNull();
-      expect(kstStartOfDay('2026-2-5')).toBeNull();
+      expect(kstEndOfDay('2026-02-15T00:00:00Z')).toBeNull();
+      expect(kstEndOfDay('날짜아님')).toBeNull();
+      expect(kstEndOfDay('2026-2-5')).toBeNull();
     });
 
     it('존재하지 않는 날짜(롤오버)는 null을 반환한다', () => {
-      expect(kstStartOfDay('2026-02-31')).toBeNull();
-      expect(kstStartOfDay('2026-13-01')).toBeNull();
+      expect(kstEndOfDay('2026-02-31')).toBeNull();
+      expect(kstEndOfDay('2026-13-01')).toBeNull();
     });
   });
 

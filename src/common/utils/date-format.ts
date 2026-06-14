@@ -16,13 +16,14 @@ export function toDateOnlyString(date: Date): string {
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-// YYYY-MM-DD 날짜를 KST 기준 '그 날 시작'(00:00:00+09:00) 시각으로 변환한다.
+// YYYY-MM-DD 날짜를 KST 기준 '그 날 끝'(23:59:59.999+09:00) 시각으로 변환한다.
+// 시점 스냅샷 조회에서 당일 생성·승인된 버전도 그 날짜로 잡히도록 하루의 끝을 기준으로 한다.
 // 형식이 틀리거나 존재하지 않는 날짜(예: 2026-02-31)면 null을 반환한다.
-export function kstStartOfDay(dateStr: string): Date | null {
+export function kstEndOfDay(dateStr: string): Date | null {
   if (!DATE_ONLY_PATTERN.test(dateStr)) {
     return null;
   }
-  const date = new Date(`${dateStr}T00:00:00.000+09:00`);
+  const date = new Date(`${dateStr}T23:59:59.999+09:00`);
   if (Number.isNaN(date.getTime())) {
     return null;
   }

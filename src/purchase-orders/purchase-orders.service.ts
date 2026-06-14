@@ -16,7 +16,7 @@ import { ConfirmPurchaseOrderDto } from './dto/confirm-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 import { OrderStatus, Prisma, UserRole } from '@generated/prisma/client';
-import { kstStartOfDay } from '@/common/utils/date-format';
+import { kstEndOfDay } from '@/common/utils/date-format';
 
 @Injectable()
 export class PurchaseOrdersService {
@@ -169,8 +169,9 @@ export class PurchaseOrdersService {
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
-    // 조회 시점은 날짜(YYYY-MM-DD)만 받아 KST 기준 '그 날 시작' 시각으로 환산한다.
-    const atDate = kstStartOfDay(at);
+    // 조회 시점은 날짜(YYYY-MM-DD)만 받아 KST 기준 '그 날 끝' 시각으로 환산한다.
+    // 당일 생성·승인된 버전도 그 날짜로 조회되도록 하루의 끝을 기준으로 한다.
+    const atDate = kstEndOfDay(at);
     if (atDate === null) {
       throw new BadRequestException(`Invalid date format (expected YYYY-MM-DD): ${at}`);
     }

@@ -4,7 +4,7 @@
 
 ### 변경 요청 승인 (승인 시 changes를 적용한 새 버전을 만들고 발주서에 반영, 검토 의견은 선택)
 # reviewerId는 users.http에서 만든 SOURCING의 실제 id로 바꾼다.
-PATCH {{host}}/change-requests/1
+PATCH {{host}}/change-requests/3
 Content-Type: application/json
 
 {

@@ -568,10 +568,10 @@ describe('PurchaseOrdersService', () => {
       const result = await service.findSnapshot(1, at);
 
       expect(repository.findById).toHaveBeenCalledWith(1);
-      // 날짜는 KST '그 날 시작'(00:00+09:00) 시각으로 환산되어 전달된다
+      // 날짜는 KST '그 날 끝'(23:59:59.999+09:00) 시각으로 환산되어 전달된다
       expect(repository.findVersionAt).toHaveBeenCalledWith(
         1,
-        new Date('2026-01-15T00:00:00.000+09:00'),
+        new Date('2026-01-15T23:59:59.999+09:00'),
       );
       expect(result).toBeInstanceOf(PurchaseOrderVersionResponseDto);
       expect(result.versionNo).toBe(1);

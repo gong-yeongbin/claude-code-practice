@@ -7,7 +7,7 @@ POST {{host}}/purchase-orders
 Content-Type: application/json
 
 {
-  "buyerId": 1,
+  "buyerId": 2,
   "productName": "코튼 티셔츠",
   "quantity": 1000,
   "unitPrice": "5500.00",
@@ -23,7 +23,7 @@ PATCH {{host}}/purchase-orders/1/submit
 Content-Type: application/json
 
 {
-  "requesterId": 1
+  "requesterId": 2
 }
 
 ### 발주서 확정 (PENDING→CONFIRMED). 경로 id는 발주서 data.id, requesterId는 users.http에서 만든 SOURCING의 id여야 한다. requesterId 계정이 없으면 404
@@ -31,7 +31,7 @@ PATCH {{host}}/purchase-orders/1/confirm
 Content-Type: application/json
 
 {
-  "requesterId": 2
+  "requesterId": 1
 }
 
 ### 발주서 변경 요청 생성 (발주서가 CONFIRMED 상태여야 한다. 경로 id·requesterId를 실제 id로 바꾼다. requesterId 계정이 없으면 404)
@@ -40,16 +40,16 @@ POST {{host}}/purchase-orders/1/change-requests
 Content-Type: application/json
 
 {
-  "requesterId": 1,
+  "requesterId": 2,
   "reason": "수량을 늘리고 납기를 미뤄야 합니다",
   "changes": {
     "quantity": {
       "old": 1000,
-      "new": 1500
+      "new": 3000
     },
     "delivery_date": {
       "old": "2026-08-01",
-      "new": "2026-08-15"
+      "new": "2026-08-01"
     }
   }
 }
@@ -59,18 +59,18 @@ GET {{host}}/purchase-orders/1
 Accept: application/json
 
 ### 발주서 특정 버전 조회 (purchaseOrderId와 versionNo로 스냅샷 조회)
-GET {{host}}/purchase-orders/1/versions/1
+GET {{host}}/purchase-orders/1/versions/2
 Accept: application/json
 
 ### 발주서 승인 이력 조회 (승인된 변경 요청을 시간순으로 반환)
-GET {{host}}/purchase-orders/93/approval-histories
+GET {{host}}/purchase-orders/1/approval-histories
 Accept: application/json
 
 ### 발주서 시점 스냅샷 조회 (at 날짜의 KST 자정 기준으로 유효했던 버전 반환)
-GET {{host}}/purchase-orders/2/snapshot?at=2026-06-15
+GET {{host}}/purchase-orders/1/snapshot?at=2026-06-14
 Accept: application/json
 
 ### 발주서 두 버전 비교 (from·to 버전 사이에 바뀐 필드만 반환)
 # to=2는 변경 요청이 승인돼 버전 2가 생긴 뒤에만 동작한다.
-GET {{host}}/purchase-orders/93/diff?from=1&to=2
+GET {{host}}/purchase-orders/1/diff?from=1&to=2
 Accept: application/json
