@@ -18,13 +18,6 @@ import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-versio
 import { OrderStatus, Prisma, UserRole } from '@generated/prisma/client';
 import { kstStartOfDay } from '@/common/utils/date-format';
 
-// CONFIRMED 이상(CONFIRMED→IN_PRODUCTION→COMPLETED)부터 변경 요청이 가능하다
-const CHANGE_REQUESTABLE_STATUSES: OrderStatus[] = [
-  OrderStatus.CONFIRMED,
-  OrderStatus.IN_PRODUCTION,
-  OrderStatus.COMPLETED,
-];
-
 @Injectable()
 export class PurchaseOrdersService {
   constructor(private readonly purchaseOrdersRepository: PurchaseOrdersRepository) {}
@@ -105,7 +98,7 @@ export class PurchaseOrdersService {
   }
 
   // 주문자가 특정 발주서에 대한 변경 요청을 생성. 발주서가 없으면 NotFoundException.
-  // 주문자(buyer) 본인만 요청 가능하며, 발주서 상태가 CONFIRMED 이상일 때만 허용한다.
+  // 주문자(buyer) 본인만 요청 가능하며, 발주서 상태가 PENDING일 때만 허용한다.
   async requestChange(id: number, dto: CreateChangeRequestDto): Promise<ChangeRequestResponseDto> {
     const purchaseOrderId = id;
     const order = await this.purchaseOrdersRepository.findById(purchaseOrderId);
@@ -117,9 +110,9 @@ export class PurchaseOrdersService {
       throw new ForbiddenException(`Only the buyer can request changes for PurchaseOrder ${id}`);
     }
 
-    if (!CHANGE_REQUESTABLE_STATUSES.includes(order.status)) {
+    if (order.status !== OrderStatus.PENDING) {
       throw new ConflictException(
-        `PurchaseOrder ${id} is ${order.status}; change requests require CONFIRMED or later status`,
+        `PurchaseOrder ${id} is ${order.status}; change requests require PENDING status`,
       );
     }
 

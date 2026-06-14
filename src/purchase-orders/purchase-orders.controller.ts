@@ -84,14 +84,14 @@ export class PurchaseOrdersController {
   @Post(':id/change-requests')
   @ApiOperation({
     summary: '발주서 변경 요청 생성',
-    description: '주문자 본인만, 발주서가 CONFIRMED 이상일 때 요청 가능. 동시 PENDING은 불가.',
+    description: '주문자 본인만, 발주서가 PENDING 상태일 때 요청 가능. 동시 PENDING은 불가.',
   })
   @ApiParam({ name: 'id', type: Number, description: '발주서 ID' })
   @ApiWrappedResponse(ChangeRequestResponseDto, { status: 201, description: '생성된 변경 요청' })
   @ApiErrorResponse(400, '요청 본문 검증 실패')
   @ApiErrorResponse(403, '주문자(buyer) 본인이 아님')
   @ApiErrorResponse(404, '발주서를 찾을 수 없음')
-  @ApiErrorResponse(409, '상태가 CONFIRMED 미만이거나 처리 대기 중인 변경 요청 존재')
+  @ApiErrorResponse(409, '상태가 PENDING이 아니거나 처리 대기 중인 변경 요청 존재')
   async requestChange(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateChangeRequestDto,
