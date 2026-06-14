@@ -12,9 +12,10 @@ import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { SubmitPurchaseOrderDto } from './dto/submit-purchase-order.dto';
+import { ConfirmPurchaseOrderDto } from './dto/confirm-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
-import { OrderStatus, Prisma } from '@generated/prisma/client';
+import { OrderStatus, Prisma, UserRole } from '@generated/prisma/client';
 import { kstStartOfDay } from '@/common/utils/date-format';
 
 // CONFIRMED 이상(CONFIRMED→IN_PRODUCTION→COMPLETED)부터 변경 요청이 가능하다
@@ -68,6 +69,29 @@ export class PurchaseOrdersService {
     }
 
     const updated = await this.purchaseOrdersRepository.updateStatus(id, OrderStatus.PENDING);
+    return PurchaseOrderResponseDto.fromEntity(updated);
+  }
+
+  // 발주서를 확정해 PENDING→CONFIRMED로 전환한다. 발주서가 없으면 NotFoundException,
+  // 요청자가 소싱팀(SOURCING)이 아니면 ForbiddenException, PENDING 상태가 아니면 ConflictException.
+  async confirm(id: number, dto: ConfirmPurchaseOrderDto): Promise<PurchaseOrderResponseDto> {
+    const order = await this.purchaseOrdersRepository.findById(id);
+    if (!order) {
+      throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+
+    const requester = await this.purchaseOrdersRepository.findUser(dto.requesterId);
+    if (!requester || requester.role !== UserRole.SOURCING) {
+      throw new ForbiddenException(`Only the sourcing team can confirm PurchaseOrder ${id}`);
+    }
+
+    if (order.status !== OrderStatus.PENDING) {
+      throw new ConflictException(
+        `PurchaseOrder ${id} is ${order.status}; only PENDING orders can be confirmed`,
+      );
+    }
+
+    const updated = await this.purchaseOrdersRepository.updateStatus(id, OrderStatus.CONFIRMED);
     return PurchaseOrderResponseDto.fromEntity(updated);
   }
 

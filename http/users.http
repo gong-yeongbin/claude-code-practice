@@ -7,8 +7,8 @@ POST {{host}}/users
 Content-Type: application/json
 
 {
-  "name": "홍길동",
-  "role": "BUYER"
+  "name": "홍길동2",
+  "role": "SOURCING"
 }
 
 ### 유저 전체 조회

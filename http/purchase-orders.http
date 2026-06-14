@@ -7,7 +7,7 @@ POST {{host}}/purchase-orders
 Content-Type: application/json
 
 {
-  "buyerId": 1,
+  "buyerId": 584,
   "productName": "코튼 티셔츠",
   "quantity": 1000,
   "unitPrice": "5500.00",
@@ -19,11 +19,19 @@ Content-Type: application/json
 }
 
 ### 발주서 제출 (DRAFT→PENDING). 경로 id는 생성 응답의 data.id, requesterId는 buyerId와 같아야 한다
-PATCH {{host}}/purchase-orders/1/submit
+PATCH {{host}}/purchase-orders/869/submit
 Content-Type: application/json
 
 {
-  "requesterId": 1
+  "requesterId": 584
+}
+
+### 발주서 확정 (PENDING→CONFIRMED). 경로 id는 발주서 data.id, requesterId는 users.http에서 만든 SOURCING의 id여야 한다
+PATCH {{host}}/purchase-orders/869/confirm
+Content-Type: application/json
+
+{
+  "requesterId": 585
 }
 
 ### 발주서 변경 요청 생성 (경로 id·requesterId를 실제 id로 바꾼다)

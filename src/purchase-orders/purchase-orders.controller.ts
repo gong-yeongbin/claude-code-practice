@@ -7,6 +7,7 @@ import { PurchaseOrderResponseDto } from './dto/purchase-order-response.dto';
 import { PurchaseOrderVersionResponseDto } from './dto/purchase-order-version-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { SubmitPurchaseOrderDto } from './dto/submit-purchase-order.dto';
+import { ConfirmPurchaseOrderDto } from './dto/confirm-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { PurchaseOrderVersionDiffResponseDto } from './dto/purchase-order-version-diff-response.dto';
 import { ApiErrorResponse, ApiWrappedResponse } from '@/common/decorators/api-response.decorator';
@@ -49,6 +50,24 @@ export class PurchaseOrdersController {
     @Body() dto: SubmitPurchaseOrderDto,
   ): Promise<PurchaseOrderResponseDto> {
     return this.purchaseOrdersService.submit(id, dto);
+  }
+
+  @Patch(':id/confirm')
+  @ApiOperation({
+    summary: '발주서 확정(PENDING→CONFIRMED)',
+    description: '소싱팀(SOURCING)만, 발주서가 PENDING 상태일 때 확정 가능.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: '발주서 ID' })
+  @ApiWrappedResponse(PurchaseOrderResponseDto, { description: '확정된 발주서' })
+  @ApiErrorResponse(400, '요청 본문 검증 실패')
+  @ApiErrorResponse(403, '소싱팀(SOURCING)이 아님')
+  @ApiErrorResponse(404, '발주서를 찾을 수 없음')
+  @ApiErrorResponse(409, '발주서가 PENDING 상태가 아님')
+  async confirm(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConfirmPurchaseOrderDto,
+  ): Promise<PurchaseOrderResponseDto> {
+    return this.purchaseOrdersService.confirm(id, dto);
   }
 
   @Get(':id/approval-histories')

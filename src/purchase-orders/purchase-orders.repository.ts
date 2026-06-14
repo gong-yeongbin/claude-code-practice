@@ -7,6 +7,7 @@ import {
   OrderStatus,
   Prisma,
   PurchaseOrderVersion,
+  User,
 } from '@generated/prisma/client';
 import { PurchaseOrderWithVersion } from './dto/purchase-order-response.dto';
 
@@ -108,6 +109,11 @@ export class PurchaseOrdersRepository {
     }
 
     return { ...order, currentVersionData: version };
+  }
+
+  // 확정 권한 검증(소싱팀 여부)을 위해 요청자(users.id)를 조회
+  async findUser(id: number): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { id } });
   }
 
   async findApprovalHistories(purchaseOrderId: number): Promise<ChangeRequest[]> {

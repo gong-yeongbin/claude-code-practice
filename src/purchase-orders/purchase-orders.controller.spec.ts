@@ -10,6 +10,7 @@ import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { ChangeRequestResponseDto } from './dto/change-request-response.dto';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { SubmitPurchaseOrderDto } from './dto/submit-purchase-order.dto';
+import { ConfirmPurchaseOrderDto } from './dto/confirm-purchase-order.dto';
 import { ChangeRequestStatus, OrderStatus } from '@generated/prisma/client';
 
 describe('PurchaseOrdersController', () => {
@@ -18,6 +19,7 @@ describe('PurchaseOrdersController', () => {
     create: jest.Mock;
     find: jest.Mock;
     submit: jest.Mock;
+    confirm: jest.Mock;
     requestChange: jest.Mock;
     findApprovalHistories: jest.Mock;
     findVersion: jest.Mock;
@@ -59,6 +61,7 @@ describe('PurchaseOrdersController', () => {
       create: jest.fn(),
       find: jest.fn(),
       submit: jest.fn(),
+      confirm: jest.fn(),
       requestChange: jest.fn(),
       findApprovalHistories: jest.fn(),
       findVersion: jest.fn(),
@@ -134,6 +137,26 @@ describe('PurchaseOrdersController', () => {
       service.submit.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
 
       await expect(controller.submit(999, dto)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('confirm', () => {
+    const dto: ConfirmPurchaseOrderDto = { requesterId: 20 };
+    const confirmed: PurchaseOrderResponseDto = { ...mockResponse, status: OrderStatus.CONFIRMED };
+
+    it('id와 dto를 service.confirm에 전달하고 결과를 반환한다', async () => {
+      service.confirm.mockResolvedValue(confirmed);
+
+      const result = await controller.confirm(1, dto);
+
+      expect(service.confirm).toHaveBeenCalledWith(1, dto);
+      expect(result).toBe(confirmed);
+    });
+
+    it('service가 던진 예외를 그대로 전파한다', async () => {
+      service.confirm.mockRejectedValue(new NotFoundException('PurchaseOrder 999 not found'));
+
+      await expect(controller.confirm(999, dto)).rejects.toThrow(NotFoundException);
     });
   });
 

@@ -119,6 +119,22 @@ describe('PurchaseOrdersRepository', () => {
     });
   });
 
+  describe('findUser', () => {
+    it('존재하는 사용자를 반환한다', async () => {
+      const user = await repository.findUser(buyerId);
+
+      expect(user).not.toBeNull();
+      expect(user!.id).toBe(buyerId);
+      expect(user!.role).toBe(UserRole.BUYER);
+    });
+
+    it('존재하지 않는 id면 null을 반환한다', async () => {
+      const user = await repository.findUser(999999);
+
+      expect(user).toBeNull();
+    });
+  });
+
   describe('findApprovalHistories', () => {
     it('APPROVED 상태의 변경 요청만 createdAt 오름차순으로 반환한다', async () => {
       const po = await repository.create(baseInput());
