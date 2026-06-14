@@ -60,6 +60,11 @@ export class PurchaseOrdersService {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
     }
 
+    const requester = await this.purchaseOrdersRepository.findUser(dto.requesterId);
+    if (!requester) {
+      throw new NotFoundException(`User ${dto.requesterId} not found`);
+    }
+
     if (dto.requesterId !== order.buyerId) {
       throw new ForbiddenException(`Only the buyer can submit PurchaseOrder ${id}`);
     }
@@ -83,7 +88,10 @@ export class PurchaseOrdersService {
     }
 
     const requester = await this.purchaseOrdersRepository.findUser(dto.requesterId);
-    if (!requester || requester.role !== UserRole.SOURCING) {
+    if (!requester) {
+      throw new NotFoundException(`User ${dto.requesterId} not found`);
+    }
+    if (requester.role !== UserRole.SOURCING) {
       throw new ForbiddenException(`Only the sourcing team can confirm PurchaseOrder ${id}`);
     }
 
@@ -113,6 +121,11 @@ export class PurchaseOrdersService {
     const order = await this.purchaseOrdersRepository.findById(purchaseOrderId);
     if (!order) {
       throw new NotFoundException(`PurchaseOrder ${id} not found`);
+    }
+
+    const requester = await this.purchaseOrdersRepository.findUser(dto.requesterId);
+    if (!requester) {
+      throw new NotFoundException(`User ${dto.requesterId} not found`);
     }
 
     if (dto.requesterId !== order.buyerId) {

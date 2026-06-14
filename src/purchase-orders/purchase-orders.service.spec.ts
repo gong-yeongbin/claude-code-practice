@@ -223,6 +223,10 @@ describe('PurchaseOrdersService', () => {
   describe('submit', () => {
     const dto = { requesterId: 10 };
 
+    beforeEach(() => {
+      repository.findUser.mockResolvedValue(mockBuyerUser);
+    });
+
     it('주문자 본인이 DRAFT 발주서를 제출하면 PENDING으로 변경하고 ResponseDto를 반환한다', async () => {
       repository.findById.mockResolvedValue(mockEntity);
       repository.updateStatus.mockResolvedValue({ ...mockEntity, status: OrderStatus.PENDING });
@@ -241,6 +245,15 @@ describe('PurchaseOrdersService', () => {
 
       await expect(service.submit(999, dto)).rejects.toThrow(NotFoundException);
       await expect(service.submit(999, dto)).rejects.toThrow('PurchaseOrder 999 not found');
+      expect(repository.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('요청자 계정이 존재하지 않으면 NotFoundException을 던지고 상태를 변경하지 않는다', async () => {
+      repository.findById.mockResolvedValue(mockEntity);
+      repository.findUser.mockResolvedValue(null);
+
+      await expect(service.submit(1, dto)).rejects.toThrow(NotFoundException);
+      await expect(service.submit(1, dto)).rejects.toThrow('User 10 not found');
       expect(repository.updateStatus).not.toHaveBeenCalled();
     });
 
@@ -294,11 +307,12 @@ describe('PurchaseOrdersService', () => {
       expect(repository.updateStatus).not.toHaveBeenCalled();
     });
 
-    it('요청자가 존재하지 않으면 ForbiddenException을 던지고 상태를 변경하지 않는다', async () => {
+    it('요청자가 존재하지 않으면 NotFoundException을 던지고 상태를 변경하지 않는다', async () => {
       repository.findById.mockResolvedValue(pendingOrder);
       repository.findUser.mockResolvedValue(null);
 
-      await expect(service.confirm(1, dto)).rejects.toThrow(ForbiddenException);
+      await expect(service.confirm(1, dto)).rejects.toThrow(NotFoundException);
+      await expect(service.confirm(1, dto)).rejects.toThrow('User 20 not found');
       expect(repository.updateStatus).not.toHaveBeenCalled();
     });
 
@@ -389,6 +403,10 @@ describe('PurchaseOrdersService', () => {
       status: OrderStatus.PENDING,
     };
 
+    beforeEach(() => {
+      repository.findUser.mockResolvedValue(mockBuyerUser);
+    });
+
     it('주문자 본인이 PENDING 발주서에 변경 요청하면 생성하고 ResponseDto를 반환한다', async () => {
       repository.findById.mockResolvedValue(pendingEntity);
       repository.existsPendingChangeRequest.mockResolvedValue(false);
@@ -418,6 +436,15 @@ describe('PurchaseOrdersService', () => {
 
       await expect(service.requestChange(999, dto)).rejects.toThrow(NotFoundException);
       await expect(service.requestChange(999, dto)).rejects.toThrow('PurchaseOrder 999 not found');
+      expect(repository.createChangeRequest).not.toHaveBeenCalled();
+    });
+
+    it('요청자 계정이 존재하지 않으면 NotFoundException을 던지고 생성하지 않는다', async () => {
+      repository.findById.mockResolvedValue(pendingEntity);
+      repository.findUser.mockResolvedValue(null);
+
+      await expect(service.requestChange(1, dto)).rejects.toThrow(NotFoundException);
+      await expect(service.requestChange(1, dto)).rejects.toThrow('User 10 not found');
       expect(repository.createChangeRequest).not.toHaveBeenCalled();
     });
 

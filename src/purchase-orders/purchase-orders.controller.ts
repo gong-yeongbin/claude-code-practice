@@ -45,7 +45,7 @@ export class PurchaseOrdersController {
   @ApiWrappedResponse(PurchaseOrderResponseDto, { description: '제출된 발주서' })
   @ApiErrorResponse(400, '요청 본문 검증 실패')
   @ApiErrorResponse(403, '주문자(buyer) 본인이 아님')
-  @ApiErrorResponse(404, '발주서를 찾을 수 없음')
+  @ApiErrorResponse(404, '발주서 또는 요청자 계정을 찾을 수 없음')
   @ApiErrorResponse(409, '발주서가 DRAFT 상태가 아님')
   async submit(
     @Param('id', ParseIntPipe) id: number,
@@ -63,7 +63,7 @@ export class PurchaseOrdersController {
   @ApiWrappedResponse(PurchaseOrderResponseDto, { description: '확정된 발주서' })
   @ApiErrorResponse(400, '요청 본문 검증 실패')
   @ApiErrorResponse(403, '소싱팀(SOURCING)이 아님')
-  @ApiErrorResponse(404, '발주서를 찾을 수 없음')
+  @ApiErrorResponse(404, '발주서 또는 요청자 계정을 찾을 수 없음')
   @ApiErrorResponse(409, '발주서가 PENDING 상태가 아님')
   async confirm(
     @Param('id', ParseIntPipe) id: number,
@@ -92,7 +92,7 @@ export class PurchaseOrdersController {
   @ApiWrappedResponse(ChangeRequestResponseDto, { status: 201, description: '생성된 변경 요청' })
   @ApiErrorResponse(400, '요청 본문 검증 실패')
   @ApiErrorResponse(403, '주문자(buyer) 본인이 아님')
-  @ApiErrorResponse(404, '발주서를 찾을 수 없음')
+  @ApiErrorResponse(404, '발주서 또는 요청자 계정을 찾을 수 없음')
   @ApiErrorResponse(409, '상태가 PENDING이 아니거나 처리 대기 중인 변경 요청 존재')
   async requestChange(
     @Param('id', ParseIntPipe) id: number,
