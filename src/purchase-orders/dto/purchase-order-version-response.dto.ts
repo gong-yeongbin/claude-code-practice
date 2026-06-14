@@ -32,7 +32,7 @@ export class PurchaseOrderVersionResponseDto {
     example: null,
   })
   changeRequestId: number | null;
-  @ApiProperty({ description: '이 버전이 유효해진 시각', example: '2026-06-13T00:00:00.000Z' })
+  @ApiProperty({ description: '이 버전이 유효해진 시각', example: '2026-06-13T09:00:00.000+09:00' })
   validFrom: Date;
   @ApiProperty({
     nullable: true,
@@ -40,7 +40,7 @@ export class PurchaseOrderVersionResponseDto {
     example: null,
   })
   validTo: Date | null;
-  @ApiProperty({ description: '생성 시각', example: '2026-06-13T00:00:00.000Z' })
+  @ApiProperty({ description: '생성 시각', example: '2026-06-13T09:00:00.000+09:00' })
   createdAt: Date;
 
   static fromEntity(entity: PurchaseOrderVersion): PurchaseOrderVersionResponseDto {

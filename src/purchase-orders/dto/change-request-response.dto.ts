@@ -34,9 +34,9 @@ export class ChangeRequestResponseDto {
   reviewComment: string | null;
   @ApiProperty({ nullable: true, description: '검토 시각', example: null })
   reviewedAt: Date | null;
-  @ApiProperty({ description: '생성 시각', example: '2026-06-13T00:00:00.000Z' })
+  @ApiProperty({ description: '생성 시각', example: '2026-06-13T09:00:00.000+09:00' })
   createdAt: Date;
-  @ApiProperty({ description: '수정 시각', example: '2026-06-13T00:00:00.000Z' })
+  @ApiProperty({ description: '수정 시각', example: '2026-06-13T09:00:00.000+09:00' })
   updatedAt: Date;
 
   static fromEntity(entity: ChangeRequest): ChangeRequestResponseDto {

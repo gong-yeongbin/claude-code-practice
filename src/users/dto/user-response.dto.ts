@@ -8,9 +8,9 @@ export class UserResponseDto {
   name: string;
   @ApiProperty({ enum: UserRole, description: '사용자 역할', example: UserRole.BUYER })
   role: UserRole;
-  @ApiProperty({ description: '생성 시각', example: '2026-06-13T00:00:00.000Z' })
+  @ApiProperty({ description: '생성 시각', example: '2026-06-13T09:00:00.000+09:00' })
   createdAt: Date;
-  @ApiProperty({ description: '수정 시각', example: '2026-06-13T00:00:00.000Z' })
+  @ApiProperty({ description: '수정 시각', example: '2026-06-13T09:00:00.000+09:00' })
   updatedAt: Date;
 
   static fromEntity(user: User): UserResponseDto {
