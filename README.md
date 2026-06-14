@@ -62,14 +62,6 @@ pnpm run start:dev
 
 ---
 
-## API 문서 (Swagger)
-
-서버를 실행한 뒤 아래 주소에서 Swagger UI로 전체 엔드포인트를 확인하고 직접 호출해 볼 수 있다.
-
-- **Swagger UI**: http://localhost:3000/api-docs
-
----
-
 ## API 수동 테스트 (.http)
 
 `http/` 디렉터리에 IntelliJ HTTP Client용 요청 모음이 있다.
