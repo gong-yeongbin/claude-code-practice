@@ -107,6 +107,12 @@ describe('PurchaseOrdersController', () => {
 
       await expect(controller.create(dto)).rejects.toThrow(ForbiddenException);
     });
+
+    it('buyerId 계정이 없어 service가 NotFoundException을 던지면 그대로 전파한다', async () => {
+      service.create.mockRejectedValue(new NotFoundException('User 10 not found'));
+
+      await expect(controller.create(dto)).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('find', () => {

@@ -22,6 +22,7 @@ export class PurchaseOrdersController {
   @ApiWrappedResponse(PurchaseOrderResponseDto, { status: 201, description: '생성된 발주서' })
   @ApiErrorResponse(400, '요청 본문 검증 실패')
   @ApiErrorResponse(403, 'BUYER 계정이 아님')
+  @ApiErrorResponse(404, 'buyerId 계정을 찾을 수 없음')
   async create(@Body() dto: CreatePurchaseOrderDto): Promise<PurchaseOrderResponseDto> {
     return this.purchaseOrdersService.create(dto);
   }

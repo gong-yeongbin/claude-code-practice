@@ -25,7 +25,10 @@ export class PurchaseOrdersService {
   // 발주서를 생성한다. 생성 주체(buyerId)가 BUYER 역할 계정일 때만 허용한다.
   async create(dto: CreatePurchaseOrderDto): Promise<PurchaseOrderResponseDto> {
     const buyer = await this.purchaseOrdersRepository.findUser(dto.buyerId);
-    if (!buyer || buyer.role !== UserRole.BUYER) {
+    if (!buyer) {
+      throw new NotFoundException(`User ${dto.buyerId} not found`);
+    }
+    if (buyer.role !== UserRole.BUYER) {
       throw new ForbiddenException('Only a BUYER account can create a PurchaseOrder');
     }
 

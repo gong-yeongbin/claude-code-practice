@@ -181,10 +181,10 @@ describe('PurchaseOrdersService', () => {
       expect(result.spec).toBeNull();
     });
 
-    it('buyerId 사용자가 존재하지 않으면 ForbiddenException을 던지고 생성하지 않는다', async () => {
+    it('buyerId 사용자가 존재하지 않으면 NotFoundException을 던지고 생성하지 않는다', async () => {
       repository.findUser.mockResolvedValue(null);
 
-      await expect(service.create(dto)).rejects.toThrow(ForbiddenException);
+      await expect(service.create(dto)).rejects.toThrow(NotFoundException);
       expect(repository.create).not.toHaveBeenCalled();
     });
 
