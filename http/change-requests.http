@@ -4,23 +4,23 @@
 
 ### 변경 요청 승인 (승인 시 changes를 적용한 새 버전을 만들고 발주서에 반영, 검토 의견은 선택)
 # reviewerId는 users.http에서 만든 SOURCING의 실제 id로 바꾼다.
-PATCH {{host}}/change-requests/869
+PATCH {{host}}/change-requests/1
 Content-Type: application/json
 
 {
   "status": "APPROVED",
-  "reviewerId": 585,
+  "reviewerId": 1,
   "reviewComment": "검토 결과 승인합니다"
 }
 
 ### 소싱팀이 아닌 검토자의 승인 시도 (403 Forbidden — 승인/반려는 소싱팀만 가능)
 # reviewerId에 주문자(BUYER)의 id를 넣으면 권한이 없어 거부된다.
-PATCH {{host}}/change-requests/869
+PATCH {{host}}/change-requests/1
 Content-Type: application/json
 
 {
   "status": "APPROVED",
-  "reviewerId": 585,
+  "reviewerId": 1,
   "reviewComment": "권한 없는 사용자의 승인 시도"
 }
 
