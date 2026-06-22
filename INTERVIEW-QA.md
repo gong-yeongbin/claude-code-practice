@@ -12,6 +12,9 @@
 8. 기술 선택 — 왜 Prisma인가 (Q30)
 9. Node.js 동작 방식 (Q31)
 10. 인증 / 인가 (Q32)
+11. Redis Pub/Sub 동작 방식
+12. TypeScript란 무엇인가
+13. PostgreSQL 데이터베이스의 장점
 
 ---
 
@@ -673,3 +676,230 @@ Node.js는 **싱글 스레드 이벤트 루프 + 논블로킹 I/O**입니다. DB
 📍 가드로 옮길 역할 체크: `change-requests.service.ts:47-54`, `purchase-orders.service.ts:29-31, 64-66`.
 
 > **한 줄 정리.** OAuth2 = 인증을 위임하는 틀, JWT = 그 결과를 무상태로 담아 검증하는 토큰. JWT의 장점(무상태·확장성)과 단점(즉시 폐기 어려움)은 동전의 양면이라, 짧은 만료 + refresh token 조합이 사실상 표준입니다.
+
+---
+
+## 11. Redis Pub/Sub 동작 방식
+
+> ⚠️ **이 프로젝트에는 Redis가 구현돼 있지 않습니다.** Q1의 이벤트 소싱 설명에 나온 "이벤트 버스(publish/subscribe)"가 실제로 어떻게 돌아가는지, 그 메시징 토대를 별도로 정리한 참고 자료입니다. 코드 위치(📍) 대신 동작 방식 중심으로 적었습니다.
+
+### 한 줄 요약
+
+Redis Pub/Sub은 **채널(channel)을 매개로 발행자(publisher)와 구독자(subscriber)를 느슨하게 연결하는 메시징 모델**입니다. 발행자는 "누가 받는지" 모른 채 채널에 메시지를 던지고, 그 채널을 구독 중인 모든 구독자가 동시에 받아 갑니다.
+
+### 기본 동작
+
+세 가지 명령이 핵심입니다.
+
+- **`SUBSCRIBE ch`** — 구독자가 채널 `ch`를 구독합니다. 이 커넥션은 구독 전용 모드로 들어가, 일반 명령은 못 쓰고 메시지 수신만 합니다.
+- **`PUBLISH ch msg`** — 발행자가 채널 `ch`에 메시지 `msg`를 보냅니다. 반환값은 **그 메시지를 받은 구독자 수**입니다.
+- **`UNSUBSCRIBE ch`** — 구독을 해제합니다.
+
+발행 한 번에 구독자가 N명이면 N명 모두에게 전달됩니다(fan-out). 발행자는 수신자가 0명이든 100명이든 똑같이 던지기만 합니다.
+
+```
+구독자 A: SUBSCRIBE order.changed   ─┐
+구독자 B: SUBSCRIBE order.changed   ─┤  같은 채널 구독
+구독자 C: SUBSCRIBE order.created   ─┘  (다른 채널)
+
+발행자:  PUBLISH order.changed "{poId:1, qty:150}"
+            │
+            ├─→ A 수신 ✅
+            ├─→ B 수신 ✅
+            └─  C 미수신 (채널 다름)
+         반환값 = 2 (받은 구독자 수)
+```
+
+### 패턴 구독
+
+`PSUBSCRIBE`로 와일드카드 패턴을 구독할 수 있습니다.
+
+- `PSUBSCRIBE order.*` → `order.created`, `order.changed`, `order.approved` 등을 한 번에 받습니다.
+- 한 구독자가 도메인 이벤트 전부를 받아 라우팅하는 식으로 쓸 수 있습니다.
+
+### 핵심 특성 — "fire-and-forget"
+
+가장 중요한 점은 **메시지를 저장하지 않는다**는 것입니다. 이게 다른 메시징과 갈리는 결정적 차이입니다.
+
+- **전송 보장이 없음** — 발행 시점에 구독 중이지 않은 구독자는 그 메시지를 **영영 못 받습니다.** 메시지는 발행 즉시 살아있는 구독자에게만 뿌려지고 버려집니다.
+- **이력이 없음** — 나중에 구독한 사람은 과거 메시지를 다시 볼 수 없습니다. 큐에 쌓이지 않습니다.
+- **ACK가 없음** — 구독자가 실제로 처리했는지 발행자는 모릅니다.
+- **구독자가 죽어 있으면 유실** — 재시작 사이에 발행된 메시지는 사라집니다.
+
+즉 **"지금 듣고 있는 사람에게만, 한 번, 보장 없이"** 보내는 모델입니다.
+
+### 같은 발주서 시나리오에 대입
+
+Q1의 이벤트 소싱 예시에서 `PriceChanged` 이벤트가 발행되면, 이벤트 버스를 Redis Pub/Sub으로 구현했다고 가정할 때 이렇게 흐릅니다.
+
+```
+발주서 변경 트랜잭션 커밋 후:
+  PUBLISH po.price_changed "{poId:1, from:1000, to:1200}"
+        │
+        ├─→ 프로젝션 핸들러 : po_read_model.unitPrice = 1200 갱신
+        ├─→ 알림 핸들러     : 구매 담당자에게 메일
+        ├─→ 집계 핸들러     : 단가 변동 통계 +1
+        └─→ ERP 연동 핸들러 : 외부 시스템 전송
+```
+
+쓰기 쪽은 `PUBLISH` 한 번이면 끝이고, 후속 처리는 각 구독자가 알아서 받아 갑니다. 새 후속 처리가 생겨도 구독자만 추가하면 되니 쓰기 코드는 안 건드립니다(Q1의 이벤트 버스 설명과 동일한 장점).
+
+### 한계 — 왜 이벤트 소싱의 "진실의 원천"으로는 못 쓰나
+
+여기서 Q1과 연결되는 중요한 구분이 있습니다. **Redis Pub/Sub은 이벤트를 "전달"하는 통로일 뿐, 이벤트를 "보관"하는 저장소가 아닙니다.**
+
+- 이벤트 소싱은 이벤트 로그가 **진실의 원천(source of truth)**이라 절대 유실되면 안 됩니다. 그런데 Pub/Sub은 fire-and-forget이라 유실이 기본 동작입니다.
+- 그래서 실제 이벤트 소싱에서는 이벤트를 **먼저 DB(이벤트 스토어)에 영속화**하고, Pub/Sub은 "새 이벤트가 생겼다"고 **알리는 신호**로만 씁니다. 진실은 DB에 있고 Pub/Sub은 전달책입니다.
+
+### Pub/Sub vs Redis Streams vs 메시지 큐
+
+전송 보장이 필요하면 Pub/Sub 대신 다른 도구를 씁니다.
+
+| | Pub/Sub | Redis Streams | Kafka / RabbitMQ |
+|---|---|---|---|
+| 메시지 저장 | 안 함 (즉시 폐기) | 함 (append-only 로그) | 함 (디스크 영속) |
+| 과거 메시지 재수신 | 불가 | 가능 (offset 조회) | 가능 |
+| 전송 보장 | 없음 | ACK·소비자 그룹 | ACK·재시도·DLQ |
+| 용도 | 실시간 알림·휘발성 fan-out | 경량 이벤트 로그 | 대규모 영속 이벤트 스트리밍 |
+
+→ **"실시간 알림처럼 놓쳐도 되는 휘발성 fan-out"**에는 Pub/Sub이 가볍고 적합하지만, **"한 건도 유실되면 안 되는 이벤트"**에는 Streams나 메시지 큐를 씁니다. 이벤트 소싱의 이벤트는 후자에 해당합니다.
+
+### 흔한 오해 / 꼬리질문 대비
+
+- **"Pub/Sub이면 메시지 큐 아닌가?"** — 아닙니다. 큐는 메시지를 쌓아두고 소비자가 가져갈 때까지 보관하지만(전송 보장), Pub/Sub은 발행 즉시 살아있는 구독자에게만 뿌리고 버립니다(보장 없음).
+- **"같은 채널 구독자가 여럿이면 한 명만 받나, 다 받나?"** — **다 받습니다(fan-out/broadcast).** 큐처럼 "한 명이 가져가면 끝(competing consumers)"이 아닙니다. 작업 분배가 목적이면 Streams의 소비자 그룹이나 메시지 큐를 써야 합니다.
+- **"발행 시점에 구독자가 없으면?"** — 메시지는 그냥 버려집니다. `PUBLISH` 반환값이 0일 뿐, 에러가 아닙니다.
+- **"트랜잭션과 같이 쓸 때 주의점은?"** — DB 커밋 **전에** `PUBLISH`하면, 트랜잭션이 롤백돼도 이미 발행된 이벤트는 회수가 안 됩니다(구독자가 없는 변경을 처리해 버림). 그래서 보통 **커밋 후 발행**하거나, 더 안전하게는 **트랜잭셔널 아웃박스(outbox) 패턴**으로 이벤트를 같은 트랜잭션에 DB로 저장한 뒤 별도 프로세스가 발행합니다.
+
+---
+
+## 12. TypeScript란 무엇인가
+
+> 이 프로젝트가 실제로 TypeScript로 작성돼 있어, 일반 개념과 함께 이 코드베이스에서 어떻게 쓰이는지를 코드 위치(📍)로 연결했습니다.
+
+### 한 줄 요약
+
+TypeScript는 **JavaScript에 정적 타입(static type)을 더한 상위집합(superset) 언어**입니다. 모든 유효한 JavaScript는 그 자체로 유효한 TypeScript이고, 여기에 타입 표기를 얹어 **실행 전(컴파일 타임)에 타입 오류를 잡는** 게 핵심입니다.
+
+### 왜 쓰나 — 오류를 잡는 시점이 앞당겨진다
+
+순수 JavaScript는 **런타임에야** 오류가 터집니다. 없는 속성을 읽거나(`undefined`), 숫자에 문자열을 넣는 실수가 실제로 그 코드가 실행될 때까지 숨어 있습니다.
+
+TypeScript는 이 오류를 **컴파일 타임(`tsc`)으로 끌어올립니다.**
+
+```typescript
+// JavaScript — 런타임에야 터짐
+function total(order) {
+  return order.quantity * order.unitPrce; // 오타(unitPrce) → undefined → NaN, 그래도 실행됨
+}
+
+// TypeScript — tsc 단계에서 즉시 실패
+function total(order: { quantity: number; unitPrice: number }): number {
+  return order.quantity * order.unitPrce; // ❌ Property 'unitPrce' does not exist
+}
+```
+
+이 프로젝트는 발주서 스냅샷·버전 비교처럼 컬럼을 많이 다뤄, 오타 한 번이 곧 버그입니다. 그 위험을 컴파일 타임으로 옮긴 게 Q30(왜 Prisma인가)에서 말한 이점과 정확히 같은 맥락입니다.
+
+### 동작 방식 — 컴파일 → JS로 변환
+
+브라우저나 Node.js는 TypeScript를 직접 실행하지 못합니다. 그래서 `tsc`가 타입을 검사한 뒤 **타입 표기를 모두 지운 순수 JavaScript로 변환(transpile)**합니다.
+
+- **타입은 컴파일 후 사라집니다(type erasure).** 런타임에는 타입 정보가 없습니다. 그래서 `if (typeof x === 'string')` 같은 런타임 검사는 여전히 직접 해야 합니다.
+- 변환 산출물은 `tsconfig.json`의 `target`(이 프로젝트는 `ES2023`)·`module` 설정을 따릅니다.
+
+📍 이 프로젝트의 컴파일 설정: `tsconfig.json` — `target: ES2023`, `outDir: ./dist`(변환된 JS가 여기로 나감).
+
+### 핵심 개념
+
+- **타입 추론(inference)** — 모든 곳에 타입을 적을 필요는 없습니다. `const n = 1`이면 `n`은 자동으로 `number`로 추론됩니다. 표기는 추론이 안 되는 경계(함수 인자·공개 API)에 주로 답니다.
+- **구조적 타이핑(structural typing)** — 이름이 아니라 **모양(shape)**으로 호환을 판단합니다. 어떤 객체가 필요한 속성을 다 가지고 있으면, 그 타입을 명시적으로 선언하지 않았어도 호환됩니다(Java의 명목적 타이핑과 반대).
+- **유니온 / 제네릭** — `string | null`처럼 여러 타입을 합치거나(유니온), `Array<T>`처럼 타입을 매개변수화(제네릭)할 수 있습니다. Repository가 `T | null`을 반환하고 Service가 null을 판단하는 이 프로젝트 패턴(Q15·Q22)이 유니온의 실제 사용 예입니다.
+- **`strictNullChecks`** — 이 프로젝트는 이 옵션이 켜져 있어, `null`/`undefined`일 수 있는 값을 검사 없이 쓰면 컴파일 에러가 납니다. "버전 행이 없을 수 있다"는 상황을 타입이 강제로 짚게 만듭니다.
+
+📍 strict null 설정: `tsconfig.json` — `strictNullChecks: true`. (다만 `noImplicitAny: false`라 완전한 strict 모드는 아니어서, 타입을 안 적으면 `any`로 새는 지점이 일부 허용됩니다.)
+
+### 이 프로젝트에서 TypeScript가 일하는 곳
+
+- **Prisma 타입 생성** — `schema.prisma`에서 모델 타입을 생성해, 없는 필드나 잘못된 타입을 쓰면 `tsc`에서 바로 막힙니다. 타입의 단일 원천이 스키마입니다(Q30).
+- **데코레이터 + 메타데이터** — `tsconfig.json`의 `emitDecoratorMetadata`/`experimentalDecorators`가 켜져 있어, NestJS의 의존성 주입(`@Injectable`)과 class-validator의 DTO 검증(`@IsString` 등)이 타입 정보를 런타임까지 넘겨받아 동작합니다.
+- **DTO 타입 안전** — 요청/응답 DTO가 타입으로 정의돼, 컨트롤러·서비스 사이에 오가는 데이터 모양이 컴파일 타임에 보장됩니다(Q18의 `whitelist`/`transform`과 결합).
+
+📍 데코레이터 메타데이터 활성화: `tsconfig.json` — `emitDecoratorMetadata: true`.
+📍 타입의 단일 원천: `prisma/schema.prisma` → `@prisma/client` 타입 생성(Q30과 동일 지점).
+
+### 한계 / 꼬리질문 대비
+
+- **"타입이 있으면 런타임 검증은 필요 없나?"** — 필요합니다. 타입은 컴파일 후 지워지므로(type erasure), **외부에서 들어오는 데이터**(HTTP body, DB raw 결과)는 타입을 믿을 수 없습니다. 그래서 이 프로젝트도 입력 경계에서 class-validator로 런타임 검증을 따로 합니다(Q18·Q19).
+- **"`any`를 쓰면?"** — 타입 검사를 그 지점에서 꺼버리는 탈출구라, 남발하면 TypeScript를 쓰는 의미가 사라집니다. 이 프로젝트는 `noImplicitAny: false`라 암묵적 `any`가 일부 허용되지만, 명시적 타입을 다는 쪽이 안전합니다.
+- **"TypeScript가 런타임을 더 빠르게 하나?"** — 아닙니다. 변환 후 순수 JS이므로 런타임 성능은 동일합니다. 이점은 전적으로 **개발 시점의 안전성·자동완성·리팩터링**에 있습니다.
+
+> **한 줄 정리.** TypeScript = JavaScript + 컴파일 타임 정적 타입. 런타임에는 타입이 지워지므로, 타입은 "개발 중 실수를 막는 장치"이고 외부 입력 검증은 별도(class-validator)로 해야 합니다. 이 프로젝트에선 Prisma 타입 생성과 데코레이터 메타데이터가 그 안전성을 떠받칩니다.
+
+---
+
+## 13. PostgreSQL 데이터베이스의 장점
+
+> 이 프로젝트가 실제로 PostgreSQL 16을 쓰고 있어, 일반적인 장점을 나열하는 데 그치지 않고 **이 코드베이스가 그 장점을 실제로 어디서 쓰는지** 코드 위치(📍)로 연결했습니다. 막연히 "성능이 좋다"가 아니라, 이 과제의 어떤 결정이 PostgreSQL의 어떤 기능 덕에 가능했는지가 핵심입니다.
+
+### 한 줄 요약
+
+PostgreSQL은 **표준 SQL을 충실히 따르면서, 강한 ACID 트랜잭션·풍부한 데이터 타입·확장 기능을 갖춘 오픈소스 RDBMS**입니다. 이 프로젝트의 핵심 요구사항(동시성 제어·정밀 수치·시점 이력)이 전부 PostgreSQL 고유 기능에 직접 기대고 있습니다.
+
+### 1. 강력한 동시성 제어 (이 프로젝트가 가장 크게 의존)
+
+PostgreSQL은 **MVCC(다중 버전 동시성 제어)**로 읽기와 쓰기가 서로 막지 않게 하고, 그 위에 행 잠금·advisory lock 같은 도구를 제공합니다. 이 프로젝트의 동시성 방어선(Q7~Q13)이 전부 여기에 올라타 있습니다.
+
+- **조건부 `UPDATE` 행 잠금** — `updateMany({ where: { status: PENDING }, ... })`가 행 잠금 + 원자적 조건 평가로 동시 승인을 막습니다(Q7·Q8).
+- **`pg_advisory_xact_lock`** — 존재하지 않는 행(phantom)에 대한 "PENDING 없음" 판단을 직렬화하는 데 advisory lock을 씁니다. 이건 **PostgreSQL 고유 기능**으로, 일반 SQL 표준에는 없습니다(Q9~Q11).
+- **트랜잭션 격리 수준** — 기본 Read Committed 위에서 필요한 한 지점만 advisory lock으로 국소 직렬화했습니다(Q12).
+
+📍 조건부 잠금: `change-requests.repository.ts:60-71`.
+📍 advisory lock: `purchase-orders.repository.ts:128-149` (`pg_advisory_xact_lock`).
+
+### 2. 정밀한 수치 타입 — `NUMERIC/DECIMAL`
+
+PostgreSQL의 `NUMERIC(precision, scale)`은 **부동소수점 오차 없이** 정확한 십진수를 저장합니다. 돈·단가처럼 오차가 곧 사고인 값에 필수입니다.
+
+이 프로젝트의 단가는 `@db.Decimal(12, 2)`로 저장되고, 애플리케이션은 이 값을 끝까지 문자열로 다뤄 JS number(IEEE 754) 오차를 피합니다(Q21). 정밀 저장은 DB가, 정밀 전달은 앱이 맡는 구조입니다.
+
+📍 컬럼: `prisma/schema.prisma:111` (`@db.Decimal(12, 2)`).
+
+### 3. 타임존 인식 타임스탬프 — `TIMESTAMPTZ`
+
+`TIMESTAMPTZ`는 입력값을 **UTC로 정규화해 저장**하고 조회 시 세션 타임존으로 변환해 줍니다. "언제"를 환경에 무관하게 한 점으로 못 박는 타입입니다.
+
+이 프로젝트는 모든 시각 컬럼을 `@db.Timestamptz`로 두고, 저장은 UTC로 정확히 하되 응답 표현만 앱 경계에서 KST로 고정합니다(Q23). 시점 이력 조회(`[validFrom, validTo)` 구간)도 이 타입 위에서 동작합니다(Q1·Q4).
+
+📍 시각 컬럼: `prisma/schema.prisma:118-121` (`validFrom`/`validTo` `@db.Timestamptz`).
+
+### 4. 1급 JSON 지원 — `JSONB`
+
+PostgreSQL의 `JSONB`는 JSON을 **이진 형태로 저장**해 인덱싱·연산이 가능합니다. 스키마가 고정되지 않은 데이터를 RDB의 트랜잭션·제약 안에서 다룰 수 있습니다.
+
+이 프로젝트는 동적 키를 갖는 변경 요청(`changes`)과 자유 형식 사양(`spec`)을 `@db.JsonB`로 저장합니다. 덕분에 정형 컬럼(수량·단가)과 비정형 데이터(사양)를 한 테이블·한 트랜잭션에서 함께 다룹니다(Q19의 커스텀 밸리데이터가 이 동적 구조를 검증).
+
+📍 JSONB 컬럼: `prisma/schema.prisma:85` (`changes`), `:114` (`spec`).
+
+### 5. 강한 무결성 제약
+
+복합 유니크·외래키·체크 제약 등으로 **애플리케이션 코드가 틀려도 DB가 데이터 정합성을 지킵니다.**
+
+이 프로젝트는 `(purchase_order_id, version_no)` 복합 유니크를 동시 승인 방어의 **최후 안전망**으로 둡니다. 응용 로직(조건부 update)이 1차, DB 제약이 2차인 이중 방어입니다(Q13).
+
+📍 복합 유니크: `prisma/schema.prisma:125` (`@@unique([purchaseOrderId, versionNo], map: "uq_po_version")`).
+
+### 6. 그 밖의 일반적 장점
+
+- **표준 SQL 준수 + 확장성** — 표준을 충실히 따르면서 advisory lock·`JSONB`·배열·범위 타입·확장(extension) 등 풍부한 기능을 더합니다.
+- **오픈소스·무라이선스** — 상용 DB 대비 비용 부담이 없고 생태계가 큽니다.
+- **신뢰성** — WAL(Write-Ahead Logging) 기반 크래시 복구, 복제, 시점 복구(PITR)를 지원합니다.
+- **확장 기능** — 필요 시 PostGIS(공간), pg_trgm(유사 검색) 등을 확장으로 붙일 수 있습니다.
+
+### 꼬리질문 대비
+
+- **"왜 MySQL이 아니라 PostgreSQL인가?"** — 이 과제는 advisory lock(생성 직렬화)·`TIMESTAMPTZ`(시점 이력)·`JSONB`(동적 changes)에 직접 기대는데, 이 조합이 PostgreSQL에서 가장 자연스럽습니다. MySQL에도 유사 기능이 있지만, 이 셋을 한 번에 깔끔히 제공하는 점이 결정적이었습니다.
+- **"advisory lock이 PostgreSQL 전용이면 다른 DB로 옮길 때 문제 아닌가?"** — 맞습니다. 그 부분이 이식성을 떨어뜨립니다. 다만 Q9에서 보듯 advisory lock은 phantom 직렬화라는 한 지점에만 쓰여 격리돼 있고, partial unique index 등 다른 방식으로 대체 설계가 가능합니다.
+- **"`JSONB`를 쓰면 결국 스키마리스 아닌가?"** — 비정형 일부(`spec`)만 JSONB이고, 정형 데이터(수량·단가·버전 구간)는 일반 컬럼·제약으로 강하게 잡혀 있습니다. RDB의 무결성과 JSON의 유연성을 한 테이블에서 **선택적으로** 섞은 구조입니다.
+
+> **한 줄 정리.** 이 프로젝트가 PostgreSQL을 고른 건 "범용적으로 좋아서"가 아니라, 동시성 제어(advisory lock)·정밀 수치(Decimal)·시점 이력(Timestamptz)·동적 데이터(JSONB)라는 네 요구가 정확히 PostgreSQL의 강점과 맞물렸기 때문입니다.
