@@ -31,7 +31,7 @@
 - **저장** — 발주서의 현재 상태를 직접 저장하지 않고, 발생한 도메인 이벤트(`Created`, `QuantityChanged`, `PriceChanged` …)를 시간 순서대로 append-only로 쌓습니다. 이벤트 로그가 곧 진실의 원천(source of truth)이고, 이벤트는 일어난 사실이라 절대 수정·삭제하지 않습니다.
 - **현재 상태 조회** — 현재 발주서 값은 따로 들고 있지 않으므로, 첫 이벤트부터 순서대로 재생(replay)해 상태를 파생(projection)합니다. 보통은 이 결과를 read model로 따로 투영해 두거나, 비용을 줄이려 주기적 스냅샷(checkpoint)을 찍어 가장 가까운 스냅샷부터만 재생합니다.
 - **시점 조회** — "그 시점의 발주서 전체 값"은 그 시각까지의 이벤트만 재생하면 자연스럽게 얻어집니다. 다만 버전이 N개면 최대 N개 이벤트를 접어야 하니, 스냅샷 없이는 버전이 늘수록 조회가 느려집니다.
-- **취약점** — 이벤트 스키마(이벤트 타입·페이로드 구조)가 한 번이라도 바뀌면, 옛 이벤트를 재생하는 로직이 깨져 과거 전체가 복원 불능이 될 수 있습니다. 그래서 이벤트 버전 관리(upcasting)·프로젝션·이벤트 버스 같은 인프라가 따라오고, 재생 로직이 곧 데이터 정합성을 책임지는 구조라 운영 복잡도가 큽니다.
+- **취약점** — 이벤트 스키마(이벤트 타입·페이로드 구조)가 한 번이라도 바뀌면, 옛 이벤트를 재생하는 로직이 깨져 과거 전체가 복원 불능이 될 수 있습니다. 재생 로직이 곧 데이터 정합성을 책임지는 구조라, 이벤트 버전 관리(upcasting)·프로젝션·이벤트 버스 같은 인프라가 따라오고 운영 복잡도가 큽니다.
 
 본문 행이 없고 "사건"만 쌓이는 모습 — **purchase_order_event**
 
@@ -100,7 +100,7 @@
 
 - **저장** — 발주서 본문은 단 한 행이고, 변경이 승인되면 그 행을 제자리에서 UPDATE합니다. 누가 언제 무엇을 바꿨는지는 별도 audit 로그 테이블에 "변경 사실"로만 남깁니다.
 - **현재 값 조회** — 한 행만 읽으면 끝이라 가장 빠릅니다.
-- **약점** — audit 로그는 보통 "필드 X를 A→B로 바꿈" 식의 변경 기록이라, 임의 과거 시점의 발주서 전체 스냅샷을 복원하기 어렵습니다. 복원하려면 결국 (A)처럼 로그를 재생해 상태를 재구성해야 하는데, 본문을 덮어쓰는 구조라 과거 본문 자체는 이미 사라져 있습니다. "두 버전 비교"도 과거 본문이 없으니 곧바로 안 됩니다.
+- **약점** — audit 로그는 보통 "필드 X를 A→B로 바꿈" 식의 변경 기록이라, 임의 과거 시점의 발주서 전체 스냅샷을 복원하기 어렵습니다. 복원하려면 (A)처럼 로그를 재생해 상태를 재구성해야 합니다. 하지만 본문을 덮어쓰는 구조라 과거 본문 자체가 이미 사라져 있어, "두 버전 비교"도 곧바로 되지 않습니다.
 
 본문은 항상 한 행, 변경되면 UPDATE — **purchase_order** (06-15 시점, 최신값만 남음)
 
@@ -172,26 +172,54 @@ WHERE po_id = 1
 
 ### Q2. 스냅샷은 행 전체를 복사해서 저장 공간이 낭비되는데, 문제가 안 된다고 본 근거는?
 
-도메인 특성 때문입니다. 발주서 한 건의 필드는 5개(상품명·수량·단가·납기·사양)뿐이고, 변경은 "승인된 변경 요청"이 있을 때만 발생해서 자주 생기지 않습니다. 즉 행 복사 비용이 누적될 만한 상황이 거의 없습니다. 트레이드오프를 인지한 상태에서, 이 도메인에서는 단점이 실질적 문제가 되지 않는다고 판단해 단순함·조회 성능을 택했습니다.
+도메인 특성 때문입니다. 두 가지 근거가 있습니다.
+
+- **행 하나가 작다** — 발주서의 필드는 상품명·수량·단가·납기·사양 5개뿐이라, 한 버전을 통째로 복사해도 차지하는 용량이 미미합니다.
+- **변경이 드물다** — 버전은 "승인된 변경 요청"이 있을 때만 늘어나므로, 행 복사가 누적될 상황 자체가 거의 없습니다.
+
+즉 복사 비용도 발생 빈도도 낮아 저장 공간 부담이 쌓일 구조가 아닙니다. 트레이드오프를 인지한 상태에서, 이 도메인에서는 단점이 실질적 문제가 되지 않는다고 판단해 단순함·조회 성능을 택했습니다.
 
 📍 `change-requests.repository.ts:78-90` — 승인 트랜잭션 안에서만 새 버전 행을 create. 즉 행 복사는 "승인" 경로에서만 발생.
 
 ### Q3. 필드가 100개로 늘거나 변경이 초당 수천 건 일어나면 이 설계를 유지할 건가요?
 
-그 시점이 갈아탈 신호입니다. 행이 비대해지거나 쓰기 빈도가 높아지면 스냅샷 복사 비용이 무시 못할 수준이 되니, (A) 이벤트 소싱 + 주기적 스냅샷(checkpoint)을 섞은 하이브리드로 전환합니다. 예를 들어 N번마다 풀 스냅샷을 찍고 그 사이는 이벤트만 쌓으면, 조회 시 가장 가까운 스냅샷부터 이벤트를 재생해 재구성 비용을 상수로 제한할 수 있습니다. 처음부터 그렇게 안 한 이유는 현재 요구사항에 과한 복잡도이기 때문입니다(YAGNI).
+유지하지 않습니다. 그 시점이 바로 갈아탈 신호입니다.
+
+행이 비대해지거나 쓰기 빈도가 높아지면, 매 변경마다 행 전체를 복사하는 스냅샷 비용이 무시 못할 수준이 됩니다. 이때는 **(A) 이벤트 소싱 + 주기적 스냅샷(checkpoint) 하이브리드**로 전환합니다.
+
+- N번 변경마다 풀 스냅샷을 한 번 찍고, 그 사이의 변경은 이벤트만 쌓습니다.
+- 시점 조회 시에는 가장 가까운 스냅샷에서 출발해 그 뒤 이벤트만 재생하므로, 재구성 비용을 이벤트 수와 무관하게 상수로 제한할 수 있습니다.
+
+처음부터 이렇게 안 한 이유는, 현재 요구사항(필드 5개·드문 변경)에는 명백히 과한 복잡도이기 때문입니다(YAGNI).
 
 📍 현재 적용 로직이 `change-requests.service.ts:81-115` (`applyChanges`)에 격리돼 있어, 하이브리드로 갈아탈 때 이 메서드와 `applyApproval`만 손대면 됨(나머지 조회 경로는 무영향).
 
 ### Q4. valid_from은 inclusive, valid_to는 exclusive로 비대칭으로 정한 이유는?
 
-`[valid_from, valid_to)` 반열림 구간으로 잡으면 인접 버전의 경계 시점이 정확히 한 버전에만 속합니다. v1의 `valid_to`와 v2의 `valid_from`이 같은 시각인데, 둘 다 inclusive면 그 경계 시점에 두 버전이 동시에 매칭돼서 `findFirst`가 어느 걸 줄지 비결정적이 됩니다. exclusive로 잡아서 `validFrom <= at AND (validTo > at OR validTo IS NULL)` 조건이 어떤 시점을 넣어도 정확히 한 버전만 반환하도록 보장했습니다.
+경계 시점의 중복 매칭을 막기 위해서입니다.
+
+인접한 두 버전은 경계 시각을 공유합니다. v1의 `valid_to`와 v2의 `valid_from`이 **같은 시각**이죠. 만약 양쪽 다 inclusive라면, 그 경계 시각을 조회할 때 v1·v2가 **동시에 매칭**되어 `findFirst`가 어느 버전을 줄지 비결정적이 됩니다.
+
+그래서 `[valid_from, valid_to)` 반열림 구간으로 잡았습니다.
+
+- `validFrom`은 inclusive, `validTo`는 exclusive
+- 조회 조건: `validFrom <= at AND (validTo > at OR validTo IS NULL)`
+- 이렇게 하면 경계 시각은 **새 버전(v2)에만** 속해, 어떤 시점을 넣어도 정확히 한 버전만 반환됩니다.
 
 📍 `purchase-orders.repository.ts:162-168` — `validFrom: { lte: at }`, `OR: [{ validTo: { gt: at } }, { validTo: null }]`. `lte`(inclusive) + `gt`(exclusive)가 정확히 그 비대칭.
 📍 경계가 "딱 맞물리게" 쓰이는 곳: `change-requests.repository.ts:73-88` — 직전 버전 `validTo`에 `reviewedAt`을 찍고(line 75), 새 버전 `validFrom`에 같은 `reviewedAt`을 찍음(line 88). 그래서 그 경계 시각은 새 버전에만 속함.
 
 ### Q5. current_version 컬럼은 사실상 캐시인데 왜 중복을 뒀고, 불일치 위험은 어떻게 막나요?
 
-`validTo IS NULL`인 행을 찾으면 최신 버전을 알 수 있어 이론상 불필요하지만, 발주서 단건 조회처럼 빈번한 경로에서 매번 버전 테이블을 뒤지는 걸 피하려고 포인터로 들고 있습니다. 불일치 위험은 승인 트랜잭션 안에서 막습니다. `applyApproval`이 ① 직전 버전 `valid_to` 마감 ② 새 버전 insert ③ `current_version` 갱신을 한 트랜잭션으로 처리하므로, 셋이 함께 커밋되거나 함께 롤백돼서 중간 상태가 외부에 노출되지 않습니다.
+**왜 중복을 뒀나 — 조회 성능 때문입니다.** `validTo IS NULL`인 행을 찾으면 최신 버전을 알 수 있어 이론상 `current_version`은 없어도 됩니다. 하지만 발주서 단건 조회처럼 빈번한 경로에서 매번 버전 테이블을 뒤지는 비용을 피하려고, 최신 버전을 가리키는 포인터로 들고 있습니다.
+
+**불일치 위험은 트랜잭션으로 막습니다.** `applyApproval`이 다음 세 작업을 **한 트랜잭션**으로 처리합니다.
+
+1. 직전 버전 `valid_to` 마감
+2. 새 버전 insert
+3. `current_version` 갱신
+
+셋이 함께 커밋되거나 함께 롤백되므로, 포인터만 갱신되고 버전 행은 안 바뀐 것 같은 **중간 상태가 외부에 노출되지 않습니다.**
 
 📍 컬럼 정의: `prisma/schema.prisma:47` (`currentVersion`).
 📍 포인터로 읽는 빈번 경로: `purchase-orders.repository.ts:66-73` (`findById`가 `currentVersion`으로 버전 행을 바로 조회).
@@ -199,7 +227,11 @@ WHERE po_id = 1
 
 ### Q6. 시점 조회를 자정이 아니라 그날의 끝(23:59:59.999)으로 잡은 이유는?
 
-사용자는 날짜(YYYY-MM-DD)만 주는데, 그날 오후에 승인된 버전도 그 날짜로 조회되길 기대합니다. 자정(00:00) 기준으로 잡으면 그날 안에 생성·승인된 버전은 `valid_from`이 자정보다 뒤라 누락됩니다. 그래서 `kstEndOfDay`로 그 날의 끝 시각으로 변환해, "그 날짜 안에 존재했던 마지막 버전"이 잡히도록 했습니다.
+사용자 기대에 맞추기 위해서입니다.
+
+사용자는 날짜(`YYYY-MM-DD`)만 입력하지만, 그날 오후에 승인된 버전도 그 날짜로 조회되길 기대합니다. 그런데 자정(`00:00`) 기준으로 잡으면, 그날 안에 생성·승인된 버전은 `valid_from`이 자정보다 뒤라서 **누락**됩니다.
+
+그래서 `kstEndOfDay`로 그날의 끝 시각(`23:59:59.999`)으로 변환해, **"그 날짜 안에 존재했던 마지막 버전"**이 잡히도록 했습니다.
 
 📍 `common/utils/date-format.ts:13-26` (`kstEndOfDay`) — line 17에서 `T23:59:59.999+09:00`로 그날 끝 시각 생성.
 📍 호출부: `purchase-orders.service.ts:164-168` (`findSnapshot`).
@@ -211,46 +243,130 @@ WHERE po_id = 1
 
 ### Q7. 동시 승인 시나리오를 어떻게 막나요?
 
-`applyApproval` 트랜잭션 첫 단계에서 `updateMany({ where: { id, status: PENDING }, data: { status: APPROVED, ... } })`로 선점합니다. 두 검토자가 동시에 같은 요청을 승인하려 해도, 이 조건부 업데이트는 DB가 해당 행에 쓰기 잠금을 잡고 원자적으로 평가하므로 한쪽만 1건을 갱신하고 다른 쪽은 0건이 됩니다. `count === 0`이면 이미 처리됐다고 보고 `ConflictException`을 던져 트랜잭션 전체를 롤백합니다.
+조건부 업데이트로 선점(낙관적 락)합니다. `applyApproval` 트랜잭션 첫 단계에서 `updateMany({ where: { id, status: PENDING }, data: { status: APPROVED, ... } })`를 실행합니다.
+
+두 검토자가 동시에 같은 요청을 승인하려 해도:
+
+- DB가 해당 행에 쓰기 잠금을 잡고 조건을 원자적으로 평가하므로, **한쪽만 1건을 갱신하고 다른 쪽은 0건**이 됩니다.
+- `count === 0`이면 이미 처리됐다고 보고 `ConflictException`을 던져 트랜잭션 전체를 롤백합니다.
 
 📍 `change-requests.repository.ts:60-71` — 조건부 `updateMany`(line 60-68) + `if (claimed.count === 0) throw ConflictException`(line 69-71).
 
+> **꼬리질문 대비 — "낙관적 락 말고 다른 방식은? 왜 비관적 락을 안 썼나?"**
+>
+> 동시성 제어는 크게 두 축입니다. 같은 "변경요청 1번 동시 승인" 상황을 두 방식으로 비교하면:
+>
+> **① 낙관적 락 (이 코드가 택한 방식)** — "충돌은 드물다"고 가정하고 **일단 시도 → 안 되면 충돌 처리**.
+> ```sql
+> -- A, B가 동시에 실행
+> UPDATE change_request SET status='APPROVED'
+> WHERE id=1 AND status='PENDING';
+> -- A: 1건 갱신 성공 → 승인 진행
+> -- B: 0건 (이미 APPROVED라 조건 불일치) → ConflictException으로 롤백
+> ```
+> 보통 version 컬럼(`... AND version=3`)으로 구현하는데, 여기선 `status='PENDING'` 조건이 그 역할을 합니다.
+>
+> **② 비관적 락** — "충돌이 잦다"고 가정하고 **미리 잠금 → 진 쪽은 대기**.
+> ```sql
+> -- A가 먼저 행을 잠금
+> SELECT * FROM change_request WHERE id=1 FOR UPDATE;
+> -- B는 같은 행에 FOR UPDATE를 걸고 A가 커밋할 때까지 "블로킹"(대기)
+> -- A 커밋 후 B가 깨어나 다시 읽으면 이미 APPROVED → 그때 거절
+> ```
+> 충돌(에러)이 아니라 **대기**가 발생한다는 점이 ①과 다릅니다.
+>
+> 그 위에 보조 도구로 **advisory lock**(존재하지 않는 행=phantom 방어, Q9), **격리 수준 상향**(Serializable, Q12), **유니크 제약**(최후 안전망, Q13)이 있습니다.
+>
+> **비관적 락을 안 쓴 이유**: 승인 충돌은 "같은 발주서를 두 검토자가 같은 순간에 누르는" 드문 경우뿐인데, `FOR UPDATE`는 정상 요청까지 **매번 행을 잠그고 대기 비용을 치릅니다.** 충돌이 드문 도메인에선 조건부 `updateMany` 한 번이 더 가볍고 충분히 안전합니다. 그래서 **낙관적 락(수정) + advisory lock(생성) + 유니크 제약(안전망)** 조합을 택했습니다.
+
 ### Q8. findById로 상태 확인 후 update하는 것과 조건부 updateMany의 차이는?
 
-전자는 TOCTOU(check-then-act) 레이스가 있습니다. 두 요청이 모두 `findById`에서 PENDING을 읽은 뒤 둘 다 update를 실행하면 둘 다 승인 처리되고 버전이 두 개 생깁니다. 검사와 변경 사이에 틈이 있기 때문입니다. 조건부 `updateMany`는 "PENDING인 경우에만 APPROVED로"를 DB 한 번의 원자 연산으로 합쳐서 그 틈을 없앱니다. 참고로 Service의 review에 있는 `findById` 상태 체크는 사용자 친화적 빠른 실패용일 뿐이고, 동시성 보증은 트랜잭션 내부의 조건부 업데이트가 담당합니다.
+핵심은 **검사와 변경 사이의 틈(TOCTOU 레이스)**입니다.
+
+**① findById 후 update — 틈이 있는 방식**
+
+검사(check)와 변경(act)이 두 개의 분리된 쿼리라, 그 사이에 다른 요청이 끼어듭니다. 검토자 A·B가 변경요청 1번을 동시에 승인하면:
+
+```
+시각  검토자 A                      검토자 B
+ t1   findById → status=PENDING ✅
+ t2                                findById → status=PENDING ✅  (A가 아직 update 전)
+ t3   update SET APPROVED          (A, B 둘 다 검사를 통과한 상태)
+ t4                                update SET APPROVED
+ 결과 → 둘 다 승인됨, 버전 2개 생성 ❌
+```
+
+`t1~t3` 사이의 틈에서 B가 낡은 PENDING을 읽어버린 게 원인입니다.
+
+**② 조건부 updateMany — 틈을 없앤 방식**
+
+"PENDING인 경우에만 APPROVED로"를 **DB의 단일 원자 연산**으로 합칩니다. 검사와 변경이 한 쿼리라 끼어들 틈이 없습니다.
+
+```
+시각  검토자 A                          검토자 B
+ t1   UPDATE ... WHERE status=PENDING   UPDATE ... WHERE status=PENDING
+      → DB가 행 잠금을 잡고 직렬화
+ t2   1건 갱신 성공 ✅                   0건 (이미 APPROVED) → Conflict ❌
+ 결과 → 한 명만 승인, 버전 1개 ✅
+```
+
+**역할 분담**
+
+참고로 Service의 `review`에 있는 `findById` 상태 체크(①과 같은 형태)는 **사용자 친화적 빠른 실패용**일 뿐입니다. 이미 처리된 요청을 대부분의 정상 케이스에서 미리 거르는 용도이고, 동시성 보증은 못 합니다. 실제 정확성은 트랜잭션 내부의 조건부 `updateMany`(②)가 담당합니다.
 
 📍 "빠른 실패용" 사전 체크: `change-requests.service.ts:26-32` (`findById` 후 PENDING 아니면 Conflict).
 📍 진짜 동시성 보증: `change-requests.repository.ts:60-71` (트랜잭션 내 조건부 `updateMany`). 둘의 역할 분담이 핵심.
 
 ### Q9. 변경 요청 생성 시 pg_advisory_xact_lock을 쓴 이유는? 유니크 제약이나 사전 체크로 부족한가요?
 
-막으려는 건 "같은 발주서에 PENDING 변경 요청이 동시에 2개 생기는 것"입니다. `existsPendingChangeRequest` 체크만 있으면 두 요청이 동시에 "없음"을 읽고 둘 다 insert하는 레이스가 있습니다. 그리고 이건 유니크 제약으로 막기 어렵습니다. "PENDING일 때만 유일"이라는 부분 유니크 인덱스가 필요한데, 상태가 여러 값을 갖는 한 일반 유니크로는 표현이 안 됩니다(Postgres partial unique index로는 가능하지만 별도 설계 필요). 그래서 `purchaseOrderId`를 키로 advisory lock을 잡아 같은 발주서에 대한 생성 요청을 직렬화했습니다.
+막으려는 건 **"같은 발주서에 PENDING 변경 요청이 동시에 2개 생기는 것"**입니다.
+
+- **사전 체크만으로는 부족**: `existsPendingChangeRequest` 체크만 있으면 두 요청이 동시에 "없음"을 읽고 둘 다 insert하는 레이스가 생깁니다.
+- **유니크 제약으로도 막기 어려움**: "PENDING일 때만 유일"이라는 조건부 제약이 필요한데, 일반 유니크로는 표현이 안 됩니다(Postgres의 partial unique index로는 가능하지만 별도 설계가 필요).
+
+그래서 `purchaseOrderId`를 키로 advisory lock을 잡아, 같은 발주서에 대한 생성 요청을 직렬화했습니다.
 
 📍 `purchase-orders.repository.ts:128-149` (`createChangeRequest`) — line 129 `pg_advisory_xact_lock(${purchaseOrderId})`, line 131-139 락 획득 후 PENDING 재확인.
 
 ### Q10. Service에서 한 번, 트랜잭션 안에서 또 한 번 — 왜 두 번 체크하나요?
 
-더블 체크드 락킹 패턴입니다. Service의 첫 체크는 락을 잡기 전이라 정확성 보증은 아니고, 대부분의 정상 요청을 락 비용 없이 빠르게 걸러내는 최적화입니다. 정확성은 트랜잭션 안에서 advisory lock을 획득한 뒤 다시 한 PENDING 재확인이 담당합니다. 락을 잡은 이후의 체크라야 "검사~insert" 구간이 직렬화되어 신뢰할 수 있습니다.
+더블 체크드 락킹(double-checked locking) 패턴입니다. 두 체크의 역할이 다릅니다.
+
+- **첫 체크 (Service, 락 밖)**: 정확성 보증이 아니라 **최적화**입니다. 대부분의 정상 요청을 락 비용 없이 빠르게 걸러냅니다.
+- **두 번째 체크 (트랜잭션 안, advisory lock 획득 후)**: 정확성을 담당합니다. 락을 잡은 뒤의 체크라야 "검사~insert" 구간이 직렬화되어 신뢰할 수 있습니다.
 
 📍 첫 체크(락 밖, 최적화): `purchase-orders.service.ts:133-135`.
 📍 두 번째 체크(락 안, 정확성): `purchase-orders.repository.ts:131-139`. line 129의 락 → line 131 재확인 → line 141 insert 순서가 직렬화 보장.
 
 ### Q11. advisory lock 키로 purchaseOrderId를 그대로 넘기는데 다른 도메인과 충돌할 수 있지 않나요?
 
-맞습니다. 단일 인자 `pg_advisory_xact_lock(bigint)`은 전역 네임스페이스라 다른 도메인이 같은 정수를 쓰면 불필요하게 경합합니다. 개선하려면 2-인자 버전 `pg_advisory_xact_lock(classid, objid)`을 써서 첫 인자에 "변경요청 생성"용 네임스페이스 상수를 넣어 도메인별로 키 공간을 분리하면 됩니다.
+맞는 지적입니다. 단일 인자 `pg_advisory_xact_lock(bigint)`은 **전역 네임스페이스**라, 다른 도메인이 우연히 같은 정수를 쓰면 불필요하게 경합합니다.
+
+개선하려면 2-인자 버전 `pg_advisory_xact_lock(classid, objid)`을 쓰면 됩니다. 첫 인자에 "변경요청 생성"용 네임스페이스 상수를 넣어 도메인별로 키 공간을 분리하는 방식입니다.
 
 📍 현재 단일 인자 형태: `purchase-orders.repository.ts:129` — `SELECT pg_advisory_xact_lock(${input.purchaseOrderId})`. 여기에 네임스페이스 상수를 첫 인자로 추가하는 게 개선안.
 
 ### Q12. applyApproval 트랜잭션의 격리 수준은? advisory lock 없이 Serializable로 같은 보장을 얻을 수 있나요?
 
-명시하지 않았으므로 Postgres 기본인 Read Committed입니다. 승인 쪽은 조건부 `updateMany`의 행 잠금으로 충분해 추가 락이 필요 없습니다. 변경 요청 생성 쪽의 "PENDING 없음" 같은 조건은 존재하지 않는 행에 대한 판단이라 Read Committed에서는 막히지 않습니다. Serializable로 올리면 직렬화 이상(phantom 포함)을 잡아주지만, 충돌 시 직렬화 실패로 재시도 로직이 필요하고 전체 트랜잭션 비용이 올라갑니다. 이 한 지점만 직렬화하면 되는 상황이라 advisory lock이 더 국소적이고 가벼운 선택이었습니다.
+격리 수준을 명시하지 않았으므로 Postgres 기본인 **Read Committed**입니다.
+
+- **승인 쪽**은 조건부 `updateMany`의 행 잠금으로 충분해 추가 락이 필요 없습니다.
+- **생성 쪽**의 "PENDING 없음" 같은 조건은 존재하지 않는 행(phantom)에 대한 판단이라 Read Committed에서는 막히지 않습니다. 그래서 advisory lock이 필요합니다.
+
+Serializable로 올리면 phantom을 포함한 직렬화 이상을 잡아주지만, 충돌 시 직렬화 실패에 대비한 재시도 로직이 필요하고 트랜잭션 전체 비용이 올라갑니다. **이 한 지점만 직렬화하면 되는 상황**이라, advisory lock이 더 국소적이고 가벼운 선택이었습니다.
 
 📍 격리 수준 미지정 = 기본값: `change-requests.repository.ts:59`와 `purchase-orders.repository.ts:128`의 `$transaction(...)` 호출에 옵션 인자 없음 → Read Committed.
 📍 승인은 행 잠금으로 충분: `change-requests.repository.ts:60`(`updateMany`가 기존 행을 잠금). 생성은 phantom이라 행 잠금 불가 → 그래서 line 129 advisory lock.
 
 ### Q13. 동시 승인 방어선이 여러 겹인데 각각 무슨 케이스를 막나요?
 
-세 겹입니다. ① 조건부 `updateMany`(PENDING 선점): 같은 요청을 동시 승인하는 경우를 막습니다. ② `(purchase_order_id, version_no)` 복합 유니크: 어떤 이유로든 같은 버전 번호 insert가 두 번 시도되면 DB가 거부해 최후의 안전망 역할을 합니다. ③ 트랜잭션: ①~insert~포인터 갱신을 원자화합니다. 응용 로직(①)과 DB 제약(②)을 둘 다 둬서, 코드가 틀려도 데이터 정합성이 깨지지 않게 했습니다.
+세 겹입니다.
+
+1. **조건부 `updateMany`(PENDING 선점)**: 같은 요청을 동시에 승인하는 경우를 막습니다.
+2. **`(purchase_order_id, version_no)` 복합 유니크**: 어떤 이유로든 같은 버전 번호 insert가 두 번 시도되면 DB가 거부하는 최후의 안전망입니다.
+3. **트랜잭션**: ①~insert~포인터 갱신을 원자화합니다.
+
+응용 로직(①)과 DB 제약(②)을 함께 둬서, **코드가 틀려도 데이터 정합성이 깨지지 않도록** 이중으로 방어했습니다.
 
 📍 ① `change-requests.repository.ts:60-71` (조건부 `updateMany`).
 📍 ② `prisma/schema.prisma:101` — `@@unique([purchaseOrderId, versionNo], map: "uq_po_version")`.
@@ -262,7 +378,16 @@ WHERE po_id = 1
 
 ### Q14. Controller → Service → Repository 3계층으로 나눈 이유는?
 
-책임을 분리해 테스트와 변경을 쉽게 하기 위해서입니다. Controller는 HTTP 입출력만, Service는 비즈니스 규칙(존재·권한·상태 검증), Repository는 데이터 접근만 담당합니다. Repository를 분리하면 Service 테스트에서 Prisma를 직접 mock하지 않고 Repository만 `jest.fn()`으로 대체해 비즈니스 로직만 격리 검증할 수 있고, 나중에 ORM이나 쿼리 방식을 바꿔도 Service는 그대로 둘 수 있습니다.
+책임을 분리해 테스트와 변경을 쉽게 하기 위해서입니다. 계층별 역할은 이렇습니다.
+
+- **Controller** — HTTP 입출력만
+- **Service** — 비즈니스 규칙(존재·권한·상태 검증)
+- **Repository** — 데이터 접근만
+
+Repository를 분리한 덕에 얻는 이점은 두 가지입니다.
+
+- Service 테스트에서 Prisma를 직접 mock하지 않고 Repository만 `jest.fn()`으로 대체해, 비즈니스 로직만 격리 검증할 수 있습니다.
+- 나중에 ORM이나 쿼리 방식을 바꿔도 Service는 그대로 둘 수 있습니다.
 
 📍 Controller(HTTP만): `purchase-orders.controller.ts:25-27` 등 — Service 호출 후 반환만.
 📍 Service(규칙): `purchase-orders.service.ts:24-43` (존재·역할 검증).
@@ -271,7 +396,12 @@ WHERE po_id = 1
 
 ### Q15. 비즈니스 로직은 Service, 예외도 Service에서 던지는 경계 기준은?
 
-"이 판단에 도메인 규칙이 들어가는가"가 기준입니다. "발주서가 CONFIRMED 상태여야 변경 요청 가능", "buyer 본인만 제출 가능" 같은 규칙은 Service에 둡니다. Repository는 `T | null`을 반환만 하고, null을 받아 `NotFoundException`을 던질지는 Service가 정합니다. 예외를 Service에 모으면 HTTP 의미(404/403/409)와 도메인 규칙이 한곳에 있어 흐름을 읽기 쉽습니다.
+**"이 판단에 도메인 규칙이 들어가는가"**가 기준입니다.
+
+- "발주서가 CONFIRMED 상태여야 변경 요청 가능", "buyer 본인만 제출 가능" 같은 규칙은 Service에 둡니다.
+- Repository는 `T | null`을 반환만 하고, null을 받아 `NotFoundException`을 던질지는 Service가 정합니다.
+
+예외를 Service에 모으면 HTTP 의미(404/403/409)와 도메인 규칙이 한곳에 있어 흐름을 읽기 쉽습니다.
 
 📍 "CONFIRMED여야 변경 가능": `purchase-orders.service.ts:127-131`.
 📍 "buyer 본인만 제출": `purchase-orders.service.ts:64-66`.
@@ -279,7 +409,12 @@ WHERE po_id = 1
 
 ### Q16. 전역 인터셉터와 익셉션 필터의 실행 시점/순서는?
 
-정상 흐름에서는 핸들러가 반환한 값이 `TransformInterceptor`를 거쳐 `{ success: true, statusCode, message, data, timestamp, path }`로 래핑됩니다. 핸들러나 그 하위에서 예외가 던져지면 인터셉터의 정상 매핑을 타지 않고 `AllExceptionsFilter`가 잡아 `{ success: false, ... }`로 변환합니다. 즉 성공은 인터셉터, 실패는 필터가 책임지고, 둘 다 `main.ts`에서 전역 등록돼 새 컨트롤러를 추가해도 별도 작업이 필요 없습니다.
+성공과 실패의 책임이 갈립니다.
+
+- **성공 (인터셉터)** — 핸들러가 반환한 값이 `TransformInterceptor`를 거쳐 `{ success: true, statusCode, message, data, timestamp, path }`로 래핑됩니다.
+- **실패 (필터)** — 핸들러나 그 하위에서 예외가 던져지면 인터셉터의 정상 매핑을 타지 않고 `AllExceptionsFilter`가 잡아 `{ success: false, ... }`로 변환합니다.
+
+둘 다 `main.ts`에서 전역 등록돼 있어, 새 컨트롤러를 추가해도 별도 작업이 필요 없습니다.
 
 📍 성공 래핑: `common/interceptors/transform.interceptor.ts:29-37`.
 📍 실패 래핑: `common/filters/all-exceptions.filter.ts:39-47`.
@@ -288,7 +423,12 @@ WHERE po_id = 1
 
 ### Q17. path param은 ParseIntPipe로 변환하면서 query의 from/to는 왜 Service에서 Number()로 변환하나요?
 
-의도적 구분입니다. `id`·`versionNo` 같은 path param은 형식이 틀리면 그 자체로 잘못된 경로이므로 파이프 단에서 400으로 빠르게 거부하는 게 맞습니다. 반면 diff의 `from`/`to`는 "양의 정수"라는 도메인 규칙 검증이 필요해서, 단순 정수 변환을 넘어 `Number.isInteger && >= 1`까지 Service에서 함께 검증하고 `BadRequestException`을 던집니다. 검증 책임을 한곳에 모으려고 query는 문자열로 받아 Service에서 처리했습니다. (snapshot의 `at`도 같은 이유로 문자열로 받아 `kstEndOfDay`에서 형식 검증)
+검증의 성격이 달라 의도적으로 구분했습니다.
+
+- **path param (`id`·`versionNo`)** — 형식이 틀리면 그 자체로 잘못된 경로이므로, 파이프 단에서 400으로 빠르게 거부하는 게 맞습니다.
+- **query (`from`/`to`)** — "양의 정수"라는 도메인 규칙 검증이 필요합니다. 단순 정수 변환을 넘어 `Number.isInteger && >= 1`까지 Service에서 함께 검증하고 `BadRequestException`을 던집니다.
+
+검증 책임을 한곳(Service)에 모으려고 query는 문자열로 받았습니다. (snapshot의 `at`도 같은 이유로 문자열로 받아 `kstEndOfDay`에서 형식 검증)
 
 📍 path param은 파이프: `purchase-orders.controller.ts:34` (`@Param('id', ParseIntPipe)`), `:111` (`versionNo`).
 📍 query는 문자열로 받음: `purchase-orders.controller.ts:126-127` (`@Query('from') from: string`).
@@ -297,7 +437,13 @@ WHERE po_id = 1
 
 ### Q18. whitelist: true, forbidNonWhitelisted: true를 준 이유는?
 
-`whitelist`는 DTO에 정의되지 않은 속성을 자동으로 제거하고, `forbidNonWhitelisted`는 그런 속성이 들어오면 아예 400으로 거부합니다. 클라이언트가 `status`나 `currentVersion` 같은 서버 제어 필드를 body에 끼워 넣어 의도치 않게 덮어쓰는 mass-assignment류 문제를 차단합니다. `transform: true`는 들어온 평문 객체를 DTO 인스턴스로 변환해 타입과 데코레이터 검증이 동작하게 합니다.
+**mass-assignment류 문제를 차단**하기 위해서입니다. 세 옵션의 역할은 이렇습니다.
+
+- **`whitelist`** — DTO에 정의되지 않은 속성을 자동으로 제거합니다.
+- **`forbidNonWhitelisted`** — 그런 속성이 들어오면 아예 400으로 거부합니다.
+- **`transform`** — 들어온 평문 객체를 DTO 인스턴스로 변환해 타입과 데코레이터 검증이 동작하게 합니다.
+
+이렇게 하면 클라이언트가 `status`나 `currentVersion` 같은 서버 제어 필드를 body에 끼워 넣어 의도치 않게 덮어쓰는 일을 막을 수 있습니다.
 
 📍 `main.ts:11-13` — `new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true })`.
 
@@ -307,13 +453,25 @@ WHERE po_id = 1
 
 ### Q19. IsValidChanges 커스텀 밸리데이터를 직접 만든 이유는?
 
-`changes`는 `{ "quantity": { "new": 1500 } }`처럼 키마다 허용 필드인지, 값 타입이 그 필드에 맞는지(수량은 1 이상 정수, 단가는 양수, 사양은 객체 등) 검증해야 합니다. 이건 동적 키를 가진 JSON 구조라 `@IsString` 같은 정적 데코레이터 조합으로는 표현이 안 됩니다. 그래서 화이트리스트 필드와 필드별 타입 규칙을 한 곳에서 검증하는 커스텀 밸리데이터를 만들었습니다.
+**동적 키를 가진 JSON 구조**라 정적 데코레이터로는 표현이 안 되기 때문입니다.
+
+`changes`는 `{ "quantity": { "new": 1500 } }`처럼 키마다 두 가지를 검증해야 합니다.
+
+- 허용된 필드인지 (화이트리스트)
+- 값 타입이 그 필드에 맞는지 (수량은 1 이상 정수, 단가는 양수, 사양은 객체 등)
+
+`@IsString` 같은 정적 데코레이터 조합으로는 이런 동적 구조를 표현할 수 없어, 화이트리스트와 필드별 타입 규칙을 한 곳에서 검증하는 커스텀 밸리데이터를 만들었습니다.
 
 📍 `purchase-orders/dto/is-valid-changes.validator.ts` 전체 — 허용 필드 `ALLOWED_FIELDS`(line 3), 필드별 타입 규칙 `isValidNewValue`(line 15-28), 데코레이터 등록 `IsValidChanges`(line 49-63).
 
 ### Q20. applyChanges는 모르는 키를 무시하고 DTO 검증은 거부합니다. 화이트리스트가 두 군데 중복 아닌가요?
 
-역할이 다릅니다. DTO의 `IsValidChanges`는 입력 경계에서 허용되지 않은 키를 거부하는 1차 방어선이고, `applyChanges`의 switch는 검증을 통과한 데이터를 실제 컬럼에 매핑하는 단계라 방어적으로 모르는 키는 무시합니다. 다만 화이트리스트가 두 곳에 있는 건 인지하고 있고, 필드 목록이 늘면 한쪽만 고치는 실수가 가능합니다. 개선한다면 허용 필드와 타입 변환 규칙을 한 모듈로 모아 검증과 적용이 같은 소스를 참조하게 만들 겁니다.
+역할이 다릅니다.
+
+- **DTO의 `IsValidChanges`** — 입력 경계에서 허용되지 않은 키를 거부하는 1차 방어선.
+- **`applyChanges`의 switch** — 검증을 통과한 데이터를 실제 컬럼에 매핑하는 단계라, 방어적으로 모르는 키는 무시.
+
+다만 화이트리스트가 두 곳에 있다는 건 인지하고 있고, 필드 목록이 늘면 한쪽만 고치는 실수가 가능합니다. 개선한다면 허용 필드와 타입 변환 규칙을 한 모듈로 모아, 검증과 적용이 같은 소스를 참조하게 만들겠습니다.
 
 📍 1차 방어선(거부): `is-valid-changes.validator.ts:3` (`ALLOWED_FIELDS`).
 📍 매핑(모르는 키 무시): `change-requests.service.ts:96-112` (`applyChanges`의 switch — default 없이 빠짐).
@@ -321,7 +479,11 @@ WHERE po_id = 1
 
 ### Q21. unit_price는 Decimal(12,2)인데 JS number로 다루면 오차가 납니다. 어떻게 막나요?
 
-단가는 끝까지 문자열로 다룹니다. 현재 버전을 복사할 때 `current.unitPrice.toString()`으로 받고, 변경 적용 시에도 `String(newValue)`로 저장합니다. diff 비교도 `toString()`끼리 문자열 비교합니다. JS number(IEEE 754)로 변환하는 순간 0.1 같은 값에서 오차가 생기므로, Decimal은 number로 거치지 않고 문자열 그대로 Prisma에 넘겨 정밀도를 보존합니다.
+**단가를 끝까지 문자열로 다룹니다.** JS number(IEEE 754)로 변환하는 순간 0.1 같은 값에서 오차가 생기므로, number를 거치지 않고 문자열 그대로 Prisma에 넘겨 정밀도를 보존합니다.
+
+- **복사 시** — `current.unitPrice.toString()`으로 받음
+- **적용 시** — `String(newValue)`로 저장
+- **diff 비교** — `toString()`끼리 문자열 비교
 
 📍 컬럼: `prisma/schema.prisma:91` (`@db.Decimal(12, 2)`).
 📍 복사 시 문자열: `change-requests.service.ts:88` (`unitPrice: current.unitPrice.toString()`).
@@ -330,7 +492,10 @@ WHERE po_id = 1
 
 ### Q22. findById에서 버전을 못 찾으면 HttpException이 아니라 Error를 던지는데 왜 구분했나요?
 
-의미가 다른 두 상황을 다르게 다루기 위해서입니다. "발주서가 없음"은 클라이언트가 잘못된 id를 준 정상적인 4xx 상황이라 `NotFoundException`(404)입니다. 반면 "발주서는 있는데 `current_version`이 가리키는 버전 행이 없음"은 일어나서는 안 되는 데이터 무결성 위반입니다. 이건 클라이언트 잘못이 아니라 서버/데이터 버그이므로 일반 Error로 던져 필터가 500으로 처리하게 하고, 로그에 스택을 남겨 원인을 추적하도록 의도적으로 구분했습니다.
+**의미가 다른 두 상황을 다르게 다루기 위해서**입니다.
+
+- **"발주서가 없음"** — 클라이언트가 잘못된 id를 준 정상적인 4xx 상황 → `NotFoundException`(404).
+- **"발주서는 있는데 `current_version`이 가리키는 버전 행이 없음"** — 일어나서는 안 되는 데이터 무결성 위반. 클라이언트 잘못이 아니라 서버/데이터 버그이므로, 일반 `Error`로 던져 필터가 500으로 처리하게 하고 로그에 스택을 남겨 원인을 추적합니다.
 
 📍 "발주서 없음" → null 반환 후 404: `purchase-orders.repository.ts:62-63` + `purchase-orders.service.ts:47-49`.
 📍 "버전 행 없음" → 일반 Error(=500): `purchase-orders.repository.ts:75-79`.
@@ -342,7 +507,15 @@ WHERE po_id = 1
 
 ### Q23. Timestamptz를 쓰는데도 KST offset을 수동으로 더하는 이유는?
 
-저장은 UTC(Timestamptz)로 정확히 하되, 응답 표현만 KST로 고정하기 위해서입니다. 서버나 컨테이너의 로컬 타임존 설정에 응답 포맷이 좌우되면 환경마다 결과가 달라지므로, `toKstIsoString`에서 명시적으로 +9시간 후 `+09:00` 표기를 붙여 어떤 환경에서 띄워도 동일한 KST 문자열이 나오게 했습니다. 시점 조회의 `kstEndOfDay`도 같은 맥락으로 KST 기준 하루 경계를 명시적으로 계산합니다.
+**저장은 UTC로 정확히, 응답 표현만 KST로 고정**하기 위해서입니다.
+
+서버나 컨테이너의 로컬 타임존 설정에 응답 포맷이 좌우되면 환경마다 결과가 달라집니다. 그래서 `toKstIsoString`에서 명시적으로 +9시간을 더하고 `+09:00` 표기를 붙여, 어떤 환경에서 띄워도 동일한 KST 문자열이 나오게 했습니다. 시점 조회의 `kstEndOfDay`도 같은 맥락으로 KST 기준 하루 경계를 명시적으로 계산합니다.
+
+**Prisma의 타임존 동작과 엮으면:**
+
+- **Prisma에는 타임존 설정 옵션 자체가 없습니다.** schema에도, 클라이언트 생성 옵션에도 "DateTime을 KST로 돌려달라"고 지시할 방법이 없습니다(PostgreSQL 커넥터 기준, 관련 기능 요청이 수년째 열려 있는 상태). Prisma는 무조건 **UTC 기준 JS `Date`** 로 반환합니다.
+- `Date`는 내부적으로 epoch 밀리초만 들고 있어 타임존 정보 자체가 없으므로, 여기까지는 환경에 상관없이 UTC로 일관됩니다. **흔들리는 건 그 `Date`를 문자열로 바꾸는 표현 단계**입니다. `date.toISOString()`은 항상 UTC(`...Z`)를 주고, `toLocaleString()` 류는 서버 로컬 타임존을 따라 환경마다 달라집니다. 둘 다 KST 고정 출력에는 부적합합니다.
+- 결국 Prisma 쪽에 맡길 수 있는 설정이 없으니, **애플리케이션 경계에서 직접 +9시간 + `+09:00` 표기**를 붙이는 게 유일한 방법입니다. DB 타임존이나 서버 `TZ` 환경변수에도 의존하지 않으므로, 로컬·CI·운영 어디서 돌려도 결과가 같습니다.
 
 📍 저장 타입: `prisma/schema.prisma:95-96` (`validFrom`/`validTo` `@db.Timestamptz`).
 📍 응답 표현 고정: `date-format.ts:1-5` (`KST_OFFSET_MS`, `toKstIsoString`).
@@ -350,7 +523,12 @@ WHERE po_id = 1
 
 ### Q24. deepConvertDatesToKst로 응답의 모든 Date를 재귀 변환하는데 성능/예외는?
 
-응답 DTO는 필드 수가 적어 재귀 비용이 작아 현재는 문제가 없습니다. 다만 `spec` 같은 JSONB는 사용자 입력이라 깊거나 클 수 있어, 매우 큰 객체에서는 전체 순회 비용이 생길 수 있습니다. 실무라면 변환 대상을 응답 스키마가 아는 Date 필드로 한정하거나, 직렬화 단계에서 처리하는 방식으로 바꿔 임의 깊이의 사용자 JSON을 전부 도는 일을 피하겠습니다.
+**현재는 문제없지만, 한계는 인지하고 있습니다.**
+
+- **지금** — 응답 DTO는 필드 수가 적어 재귀 비용이 작습니다.
+- **잠재 위험** — `spec` 같은 JSONB는 사용자 입력이라 깊거나 클 수 있어, 매우 큰 객체에서는 전체 순회 비용이 생길 수 있습니다.
+
+실무라면 변환 대상을 응답 스키마가 아는 Date 필드로 한정하거나 직렬화 단계에서 처리하는 방식으로 바꿔, 임의 깊이의 사용자 JSON을 전부 도는 일을 피하겠습니다.
 
 📍 `date-format.ts:28-43` (`deepConvertDatesToKst` — 배열/객체 재귀).
 📍 모든 응답에 무조건 적용되는 지점: `transform.interceptor.ts:34` (`deepConvertDatesToKst(data)`). spec이 응답에 실리면 여기서 전부 순회됨.
@@ -361,14 +539,20 @@ WHERE po_id = 1
 
 ### Q25. Service는 Repository를 mock하고, Repository는 실제 DB로 테스트하라고 한 이유는?
 
-각 계층의 책임만 격리해서 검증하기 위해서입니다. Service 테스트는 비즈니스 규칙(상태·권한·예외)이 목표라 Repository를 mock해서 DB 없이 빠르게 분기들을 검증합니다. 반대로 Repository는 Prisma 쿼리·트랜잭션·advisory lock이 실제로 의도대로 도는지가 핵심이라 mock하면 의미가 없어, 실제 DB로 검증해야 진짜 동작을 확인할 수 있습니다.
+**각 계층의 책임만 격리해서 검증하기 위해서**입니다.
+
+- **Service 테스트** — 비즈니스 규칙(상태·권한·예외)이 목표라, Repository를 mock해 DB 없이 빠르게 분기들을 검증합니다.
+- **Repository 테스트** — Prisma 쿼리·트랜잭션·advisory lock이 실제로 의도대로 도는지가 핵심이라, mock하면 의미가 없습니다. 실제 DB로 검증해야 진짜 동작을 확인할 수 있습니다.
 
 📍 규약 명문화: `src/CLAUDE.md` "테스트" 섹션 — "Service 테스트: Repository를 `jest.fn()`으로 mock", "Repository 테스트: 실제 DB 연결로 검증(mock 금지)".
 📍 대상 파일: `*.service.spec.ts`(mock) vs `*.repository.spec.ts`(실 DB).
 
 ### Q26. 동시성 로직은 단위 테스트로 검증이 어려운데 어떻게 테스트했나요?
 
-단위 테스트로는 레이스를 재현할 수 없어, 실제 DB에 같은 변경 요청을 `Promise.all`로 동시에 여러 번 승인 요청하고 정확히 한 건만 성공·나머지는 `ConflictException`인지, 그리고 버전이 하나만 늘었는지를 확인하는 방식으로 검증합니다. 변경 요청 동시 생성(advisory lock)도 같은 발주서에 동시 생성 요청을 던져 PENDING이 하나만 생기는지 확인합니다.
+단위 테스트로는 레이스를 재현할 수 없어, **실제 DB에 `Promise.all`로 동시 요청을 던져** 검증합니다.
+
+- **동시 승인** — 같은 변경 요청을 여러 번 동시에 승인하고, 정확히 한 건만 성공·나머지는 `ConflictException`인지, 버전이 하나만 늘었는지 확인합니다.
+- **동시 생성(advisory lock)** — 같은 발주서에 동시 생성 요청을 던져 PENDING이 하나만 생기는지 확인합니다.
 
 📍 검증 대상 코드: 승인 경합 `change-requests.repository.ts:60-71`, 생성 경합 `purchase-orders.repository.ts:128-149`.
 📍 테스트 파일: `change-requests.repository.spec.ts`, `purchase-orders.repository.spec.ts`(실 DB).
@@ -381,14 +565,22 @@ WHERE po_id = 1
 
 ### Q27. 다단계 승인(결재 라인)으로 확장하려면?
 
-현재 `change_request`의 단일 `reviewer_id`/`status`로는 부족하니, 승인 단계를 별도 테이블(`approval_step`: `change_request_id`, `step_order`, `approver_id`, `status`)로 분리합니다. 변경 요청은 모든 단계가 APPROVED가 됐을 때만 버전 적용 트랜잭션을 타게 하고, 중간 단계 거부 시 전체를 REJECTED로 마감합니다. 버전 생성 트랜잭션 자체는 마지막 단계 통과 시점에 지금 구조 그대로 재사용할 수 있습니다.
+현재 `change_request`의 단일 `reviewer_id`/`status`로는 부족하니, 승인 단계를 별도 테이블(`approval_step`: `change_request_id`, `step_order`, `approver_id`, `status`)로 분리합니다.
+
+- **모든 단계가 APPROVED** 가 됐을 때만 버전 적용 트랜잭션을 타게 합니다.
+- **중간 단계 거부 시** 전체를 REJECTED로 마감합니다.
+
+핵심은, 버전 생성 트랜잭션 자체는 마지막 단계 통과 시점에 **지금 구조 그대로 재사용**할 수 있다는 점입니다.
 
 📍 현재 단일 reviewer 구조: `prisma/schema.prisma:72-74` (`reviewerId`/`reviewComment`/`reviewedAt`).
 📍 마지막 단계 통과 시 재사용할 트랜잭션: `change-requests.repository.ts:58-98` (`applyApproval` 그대로 호출).
 
 ### Q28. 버전·이력 조회에 페이지네이션이 없는데 버전이 수천 개로 늘면?
 
-현재는 변경이 드물어 미적용했지만, 목록 조회에 커서 기반 페이지네이션(`versionNo` 또는 `createdAt` 커서)을 추가하겠습니다. 시점/단건 조회는 인덱스로 한 건만 가져오니 영향이 없고, `(purchase_order_id, valid_from)` 또는 `(purchase_order_id, valid_to)`에 인덱스를 둬서 시점 조회 쿼리가 풀스캔 없이 동작하도록 보강하겠습니다.
+현재는 변경이 드물어 미적용했지만, 규모가 커지면 두 가지를 보강하겠습니다.
+
+- **목록 조회** — 커서 기반 페이지네이션(`versionNo` 또는 `createdAt` 커서)을 추가합니다.
+- **시점 조회** — 인덱스로 한 건만 가져오니 단건 자체는 영향이 없지만, `(purchase_order_id, valid_from)` 또는 `(purchase_order_id, valid_to)`에 인덱스를 둬서 풀스캔 없이 동작하도록 보강합니다.
 
 📍 페이지네이션 없는 목록 조회: `purchase-orders.repository.ts:112-117` (`findApprovalHistories` — `findMany` 전체 반환).
 📍 인덱스 보강이 필요한 시점 조회: `purchase-orders.repository.ts:161-169` (`findVersionAt`의 `validFrom`/`validTo` 조건).
@@ -396,7 +588,14 @@ WHERE po_id = 1
 
 ### Q29. requesterId/reviewerId를 body로 받는 방식의 보안 문제와 개선은?
 
-가장 큰 한계입니다. 본인이 누구인지를 클라이언트가 보내는 값으로 믿기 때문에, 아무 id나 넣어 타인을 사칭할 수 있습니다(권한 우회). 실서비스에서는 인증 토큰(JWT/세션)에서 사용자 식별자와 역할을 꺼내 쓰고, body의 id는 받지 않거나 토큰 주체와 일치하는지 검증해야 합니다. NestJS라면 `AuthGuard`로 인증을, `RolesGuard` + `@Roles()`로 SOURCING/BUYER 역할 인가를 선언적으로 처리해 Service의 역할 체크 로직을 가드로 끌어올리겠습니다. 이번 과제는 인증 범위 밖이라 역할을 명시적으로 받는 형태로 단순화했음을 전제로 둔 설계입니다.
+**가장 큰 한계입니다.** 본인이 누구인지를 클라이언트가 보내는 값으로 믿기 때문에, 아무 id나 넣어 타인을 사칭할 수 있습니다(권한 우회).
+
+개선 방향은 이렇습니다.
+
+- 인증 토큰(JWT/세션)에서 사용자 식별자와 역할을 꺼내 쓰고, body의 id는 받지 않거나 토큰 주체와 일치하는지 검증합니다.
+- NestJS라면 `AuthGuard`로 인증을, `RolesGuard` + `@Roles()`로 SOURCING/BUYER 역할 인가를 선언적으로 처리해, Service에 흩어진 역할 체크 로직을 가드로 끌어올립니다.
+
+이번 과제는 인증 범위 밖이라, 역할을 명시적으로 받는 형태로 단순화했음을 전제로 둔 설계입니다.
 
 📍 body로 신원을 받는 지점: `change-requests.controller.ts:26` (`ReviewChangeRequestDto`의 `reviewerId`), `purchase-orders.controller.ts:98` (`requesterId`).
 📍 가드로 끌어올릴 역할 체크: `change-requests.service.ts:47-54` (`assertReviewerIsSourcing`), `purchase-orders.service.ts:29-31, 64-66, 88-90, 123-125`.
@@ -407,7 +606,12 @@ WHERE po_id = 1
 
 ### Q30. TypeORM이 아니라 Prisma를 고른 이유는?
 
-핵심은 오류를 잡는 시점입니다. TypeORM은 잘못된 컬럼명·관계 누락 같은 실수가 컴파일 때 안 걸리고, 실제 쿼리가 DB에 나가는 런타임에야 터집니다. Prisma는 `schema.prisma`에서 타입을 생성해서, 없는 필드나 잘못된 타입을 쓰면 tsc 단계에서 바로 실패합니다. 이력 스냅샷·버전 비교처럼 컬럼을 많이 다루는 이 과제에서, 오타 위험을 컴파일 타임으로 끌어올린 게 가장 큰 이점이었습니다.
+**핵심은 오류를 잡는 시점입니다.**
+
+- **TypeORM** — 잘못된 컬럼명·관계 누락 같은 실수가 컴파일 때 안 걸리고, 실제 쿼리가 DB에 나가는 런타임에야 터집니다.
+- **Prisma** — `schema.prisma`에서 타입을 생성해서, 없는 필드나 잘못된 타입을 쓰면 tsc 단계에서 바로 실패합니다.
+
+이력 스냅샷·버전 비교처럼 컬럼을 많이 다루는 이 과제에서, 오타 위험을 컴파일 타임으로 끌어올린 게 가장 큰 이점이었습니다.
 
 추가로 `$transaction`·`$executeRaw`도 타입 안전하게 제공해, 승인 트랜잭션과 advisory lock 같은 raw SQL 지점에서도 파라미터 바인딩이 일관됩니다.
 
@@ -422,9 +626,14 @@ WHERE po_id = 1
 
 ### Q31. Node.js 동작 방식을 이 프로젝트와 엮어 설명한다면?
 
-Node.js는 싱글 스레드 이벤트 루프 + 논블로킹 I/O입니다. DB 쿼리 같은 I/O는 OS에 넘기고 결과를 기다리는 동안 스레드를 멈추지 않아서, 여러 요청이 `await`로 DB를 기다리는 동안 다른 요청을 처리합니다.
+Node.js는 **싱글 스레드 이벤트 루프 + 논블로킹 I/O**입니다. DB 쿼리 같은 I/O는 OS에 넘기고 결과를 기다리는 동안 스레드를 멈추지 않아서, 여러 요청이 `await`로 DB를 기다리는 동안 다른 요청을 처리합니다.
 
-여기서 핵심은 "싱글 스레드라 동시성 문제가 없다"는 오해입니다. `await` 지점마다 제어권이 넘어가 다른 요청이 끼어들 수 있어서, "PENDING 확인 → 업데이트" 사이 틈에서 TOCTOU 레이스가 그대로 납니다. 그래서 정확성을 메모리가 아니라 **DB 차원(조건부 `updateMany` 행 잠금, advisory lock)**에 맡겼습니다.
+여기서 핵심은 **"싱글 스레드라 동시성 문제가 없다"는 오해**입니다.
+
+- `await` 지점마다 제어권이 넘어가 다른 요청이 끼어들 수 있습니다.
+- 그래서 "PENDING 확인 → 업데이트" 사이 틈에서 TOCTOU 레이스가 그대로 납니다.
+
+그래서 정확성을 메모리가 아니라 **DB 차원(조건부 `updateMany` 행 잠금, advisory lock)**에 맡겼습니다.
 
 📍 인터리빙 지점: `change-requests.repository.ts:59-98`(트랜잭션 내 각 `await`).
 📍 DB로 방어: `change-requests.repository.ts:60-71`(`updateMany`), `purchase-orders.repository.ts:129`(advisory lock).
