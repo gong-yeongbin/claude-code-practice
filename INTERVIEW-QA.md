@@ -616,6 +616,23 @@ Repository를 분리한 덕에 얻는 이점은 두 가지입니다.
 
 이력 스냅샷·버전 비교처럼 컬럼을 많이 다루는 이 과제에서, 오타 위험을 컴파일 타임으로 끌어올린 게 가장 큰 이점이었습니다.
 
+**예시 — 없는 필드(`titel` 오타)를 썼을 때**
+
+```ts
+// TypeORM: tsc 통과 → 런타임에 쿼리가 나가서야 터짐
+const po = await repo.findOne({ where: { titel: '발주서' } }); // ❌ 런타임 에러
+// EntityColumnNotFound: No entity column "titel" was found.
+
+// Prisma: schema.prisma에서 생성된 타입 덕분에 tsc 단계에서 바로 실패
+const po = await prisma.purchaseOrder.findFirst({
+  where: { titel: '발주서' }, // ❌ 컴파일 에러
+  // Object literal may only specify known properties,
+  // and 'titel' does not exist in type 'PurchaseOrderWhereInput'.
+});
+```
+
+배포 전 `tsc`에서 막히느냐, 운영 중 해당 코드 경로가 실행돼야 드러나느냐의 차이입니다.
+
 추가로 `$transaction`·`$executeRaw`도 타입 안전하게 제공해, 승인 트랜잭션과 advisory lock 같은 raw SQL 지점에서도 파라미터 바인딩이 일관됩니다.
 
 📍 타입의 단일 원천: `prisma/schema.prisma` → `@prisma/client` 타입 생성.
